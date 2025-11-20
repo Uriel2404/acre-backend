@@ -3,6 +3,10 @@ import cors from "cors";
 import mysql from "mysql2";
 import dotenv from "dotenv";
 // import bcrypt from "bcrypt";
+import multer from "multer";
+
+const upload = multer({ dest: "/tmp" }); // Render solo permite /tmp
+
 
 dotenv.config();
 const app = express();
@@ -127,6 +131,7 @@ app.post("/carrusel/reorder", (req, res) => {
     .then(() => res.json({ message: "Orden actualizado" }))
     .catch(() => res.status(500).json({ message: "Error al reordenar" }));
 });
+
 
 
 
