@@ -1,0 +1,181 @@
+import express from "express";
+import cors from "cors";
+import mysql from "mysql2";
+import dotenv from "dotenv";
+// import bcrypt from "bcrypt";
+import multer from "multer";
+import ftp from "basic-ftp";
+import fs from "fs";
+
+const upload = multer({ dest: "/tmp" }); // Render solo permite /tmp
+
+
+dotenv.config();
+const app = express();
+
+//  Configuración de CORS
+app.use(cors({
+  origin: [
+    "https://acre.mx",
+    "https://www.acre.mx",
+    "http://localhost:5173"
+  ],
+  methods: ["GET", "POST"],
+}));
+app.use(express.json());
+
+//  Pool de MySQL
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+//  Ruta base de prueba
+app.get("/", (req, res) => {
+  res.send("API Funcionando ✅");
+});
+
+// Ruta de login
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Faltan datos" });
+  }
+
+  const sql = "SELECT * FROM usuarios WHERE email = ?";
+
+  db.query(sql, [email], async (err, result) => {
+    if (err) {
+      console.error("ERROR MYSQL:", err);
+      return res.status(500).json({ message: "Error en el servidor" });
+    }
+
+    if (result.length === 0) {
+      return res.status(401).json({ message: "Credenciales incorrectas" });
+    }
+
+    const user = result[0];
+
+    // ✅ Si tus contraseñas son planas (sin hash) usa esto:
+    // if (password === user.password) { ... }
+
+    // Si quieres usar hash (bcrypt):
+    // const match = await bcrypt.compare(password, user.password);
+    // if (!match) return res.status(401).json({ message: "Credenciales incorrectas" });
+
+    // Por ahora dejamos sin hash para mantener compatibilidad
+    if (password !== user.password) {
+      return res.status(401).json({ message: "Credenciales incorrectas" });
+    }
+
+    res.json({ message: "Login exitoso", user });
+  });
+});
+//  Servidor en Render
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+});
+
+
+
+
+// Obtener carrusel
+app.get("/carrusel", (req, res) => {
+  const sql = "SELECT * FROM carrusel ORDER BY orden ASC";
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ message: "Error al obtener" });
+    res.json(result);
+  });
+});
+
+// Agregar imagen
+app.post("/carrusel/add", (req, res) => {
+  const { imagen_url, titulo, descripcion } = req.body;
+
+  const sql = "INSERT INTO carrusel (imagen_url, titulo, descripcion) VALUES (?, ?, ?)";
+  db.query(sql, [imagen_url, titulo, descripcion], (err, result) => {
+    if (err) return res.status(500).json({ message: "Error al agregar" });
+    res.json({ message: "Imagen agregada", id: result.insertId });
+  });
+});
+
+// Eliminar imagen
+app.post("/carrusel/delete", (req, res) => {
+  const { id } = req.body;
+  const sql = "DELETE FROM carrusel WHERE id = ?";
+  db.query(sql, [id], (err) => {
+    if (err) return res.status(500).json({ message: "Error al eliminar" });
+    res.json({ message: "Imagen eliminada" });
+  });
+});
+
+// Reordenar imágenes
+app.post("/carrusel/reorder", (req, res) => {
+  const { order } = req.body; 
+  // order = [ { id: 1, orden: 0}, ... ]
+
+  const queries = order.map((item) =>
+    db.promise().query("UPDATE carrusel SET orden = ? WHERE id = ?", [
+      item.orden,
+      item.id,
+    ])
+  );
+
+  Promise.all(queries)
+    .then(() => res.json({ message: "Orden actualizado" }))
+    .catch(() => res.status(500).json({ message: "Error al reordenar" }));
+});
+
+
+
+// SUBIR IMAGEN AL CARROUSEL
+app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió imagen" });
+
+    const localPath = req.file.path;
+    const fileName = Date.now() + "_" + req.file.originalname;
+
+    // Conectar a tu servidor cPanel por FTP
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false
+    });
+
+    await client.uploadFrom(localPath, `/public_html/intranet/carrusel/${fileName}`);
+    client.close();
+
+    // URL final accesible
+    const imageUrl = `https://acre.mx/intranet/carrusel/${fileName}`;
+
+    // Guardarlo en MySQL
+    db.query("INSERT INTO carrusel (imagen_url) VALUES (?)", [imageUrl], (err, result) => {
+      if (err) console.log(err);
+      return res.json({ message: "Imagen subida", url: imageUrl, id: result.insertId });
+    });
+
+
+    res.json({ message: "Imagen subida", url: imageUrl });
+
+    // borrar archivo temporal
+    fs.unlinkSync(localPath);
+
+  } catch (error) {
+    console.error("UPLOAD ERROR:", error);
+    res.status(500).json({ message: "Error al subir imagen" });
+  }
+});
+
+
+
