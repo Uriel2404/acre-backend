@@ -153,11 +153,11 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
       secure: false
     });
 
-    await client.uploadFrom(localPath, `/public_html/intranet/carrusel/${fileName}`);
+    await client.uploadFrom(localPath, `/public_html/Intranet/carrusel/${fileName}`);
     client.close();
 
     // URL accesible
-    const imageUrl = `https://acre.mx/intranet/carrusel/${fileName}`;
+    const imageUrl = `https://acre.mx/Intranet/carrusel/${fileName}`;
 
     // === GUARDAR EN BASE DE DATOS ===
     const sql = "INSERT INTO carrusel (imagen_url) VALUES (?)";
@@ -182,6 +182,7 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
     res.status(500).json({ message: "Error al subir imagen" });
   }
 });
+
 
 
 
