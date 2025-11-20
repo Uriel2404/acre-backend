@@ -135,8 +135,6 @@ app.post("/carrusel/reorder", (req, res) => {
 });
 
 
-// Config temporal (Render)
-const upload = multer({ dest: "/tmp" });
 
 // SUBIR IMAGEN AL CARROUSEL
 app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
@@ -174,4 +172,5 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
     res.status(500).json({ message: "Error al subir imagen" });
   }
 });
+
 
