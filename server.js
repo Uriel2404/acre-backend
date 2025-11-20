@@ -144,7 +144,7 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
     const localPath = req.file.path;
     const fileName = Date.now() + "_" + req.file.originalname;
 
-    // Conectar a tu servidor cPanel por FTP
+    // === FTP ===
     const client = new ftp.Client();
     await client.access({
       host: process.env.FTP_HOST,
@@ -156,19 +156,25 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
     await client.uploadFrom(localPath, `/public_html/intranet/carrusel/${fileName}`);
     client.close();
 
-    // URL final accesible
+    // URL accesible
     const imageUrl = `https://acre.mx/intranet/carrusel/${fileName}`;
 
-    // Guardarlo en MySQL
-    db.query("INSERT INTO carrusel (imagen_url) VALUES (?)", [imageUrl], (err, result) => {
-      if (err) console.log(err);
-      return res.json({ message: "Imagen subida", url: imageUrl, id: result.insertId });
+    // === GUARDAR EN BASE DE DATOS ===
+    const sql = "INSERT INTO carrusel (imagen_url) VALUES (?)";
+    db.query(sql, [imageUrl], (err, result) => {
+      if (err) {
+        console.log(err);
+        return res.status(500).json({ message: "Error guardando en MySQL" });
+      }
+
+      res.json({
+        message: "Imagen subida",
+        id: result.insertId,
+        url: imageUrl
+      });
     });
 
-
-    res.json({ message: "Imagen subida", url: imageUrl });
-
-    // borrar archivo temporal
+    // Borrar archivo temporal
     fs.unlinkSync(localPath);
 
   } catch (error) {
@@ -176,6 +182,8 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
     res.status(500).json({ message: "Error al subir imagen" });
   }
 });
+
+
 
 
 
