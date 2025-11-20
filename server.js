@@ -4,6 +4,8 @@ import mysql from "mysql2";
 import dotenv from "dotenv";
 // import bcrypt from "bcrypt";
 import multer from "multer";
+import ftp from "basic-ftp";
+import fs from "fs";
 
 const upload = multer({ dest: "/tmp" }); // Render solo permite /tmp
 
@@ -133,5 +135,43 @@ app.post("/carrusel/reorder", (req, res) => {
 });
 
 
+// Config temporal (Render)
+const upload = multer({ dest: "/tmp" });
 
+// SUBIR IMAGEN AL CARROUSEL
+app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió imagen" });
+
+    const localPath = req.file.path;
+    const fileName = Date.now() + "_" + req.file.originalname;
+
+    // Conectar a tu servidor cPanel por FTP
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false
+    });
+
+    await client.uploadFrom(localPath, `/public_html/intranet/carrusel/${fileName}`);
+    client.close();
+
+    // URL final accesible
+    const imageUrl = `https://acre.mx/intranet/carrusel/${fileName}`;
+
+    // Guardarlo en MySQL
+    db.query("INSERT INTO carrusel (url) VALUES (?)", [imageUrl]);
+
+    res.json({ message: "Imagen subida", url: imageUrl });
+
+    // borrar archivo temporal
+    fs.unlinkSync(localPath);
+
+  } catch (error) {
+    console.error("UPLOAD ERROR:", error);
+    res.status(500).json({ message: "Error al subir imagen" });
+  }
+});
 
