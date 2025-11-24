@@ -207,15 +207,9 @@ app.post(
   (req, res) => {
     const { seccion, titulo, descripcion, imagen_url, fecha } = req.body;
 
-    // Fijar fecha para evitar desfase por zona horaria
-    let fechaFix = null;
-    if (fecha) {
-      const dt = new Date(fecha + "T00:00:00"); // << evita adelanto/resta de días
-      if (isNaN(dt.getTime())) {
-        return res.status(400).json({ message: "Fecha inválida" });
-      }
-      fechaFix = dt.toISOString().substring(0, 10);
-    }
+    // 🚫 NO convertir la fecha
+    // ✔️ Guardarla tal cual llega
+    const fechaFix = fecha || null;
 
     const sql =
       "INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha) VALUES (?, ?, ?, ?, ?)";
@@ -226,9 +220,7 @@ app.post(
       (err, result) => {
         if (err) {
           console.error("MYSQL ERROR:", err);
-          return res
-            .status(500)
-            .json({ message: "Error al agregar noticia" });
+          return res.status(500).json({ message: "Error al agregar noticia" });
         }
         res.json({ message: "Noticia agregada", id: result.insertId });
       }
@@ -236,21 +228,14 @@ app.post(
   }
 );
 
-
 // Editar noticia
 app.post("/noticias/edit",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { id, seccion, titulo, descripcion, imagen_url, fecha } = req.body;
 
-    let fechaFix = null;
-    if (fecha) {
-      const dt = new Date(fecha + "T00:00:00");
-      if (isNaN(dt.getTime())) {
-        return res.status(400).json({ message: "Fecha inválida" });
-      }
-      fechaFix = dt.toISOString().substring(0, 10);
-    }
+    // 🚫 NO convertir la fecha
+    const fechaFix = fecha || null;
 
     const sql =
       "UPDATE noticias SET seccion = ?, titulo = ?, descripcion = ?, imagen_url = ?, fecha = ? WHERE id = ?";
@@ -261,7 +246,6 @@ app.post("/noticias/edit",
     });
   }
 );
-
 
 // Eliminar noticia
 app.post("/noticias/delete",
@@ -336,5 +320,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
+
 
 
