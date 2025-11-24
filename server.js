@@ -201,22 +201,41 @@ app.get("/noticias", (req, res) => {
 });
 
 // Agregar noticia
-app.post("/noticias/add",
+app.post(
+  "/noticias/add",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
-    // Evita que MySQL convierta fechas por zona horaria
-    const fechaFix =
-      fecha ? new Date(fecha + "T00:00").toISOString().substring(0, 10) : null;
+    const { seccion, titulo, descripcion, imagen_url, fecha } = req.body;
+
+    // Fijar fecha para evitar desfase por zona horaria
+    let fechaFix = null;
+    if (fecha) {
+      const dt = new Date(fecha + "T00:00:00"); // << evita adelanto/resta de días
+      if (isNaN(dt.getTime())) {
+        return res.status(400).json({ message: "Fecha inválida" });
+      }
+      fechaFix = dt.toISOString().substring(0, 10);
+    }
 
     const sql =
       "INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha) VALUES (?, ?, ?, ?, ?)";
 
-    db.query(sql, [seccion, titulo, descripcion, imagen_url, fechaFix], (err, result) => {
-      if (err) return res.status(500).json({ message: "Error al agregar noticia" });
-      res.json({ message: "Noticia agregada", id: result.insertId });
-    });
+    db.query(
+      sql,
+      [seccion, titulo, descripcion, imagen_url, fechaFix],
+      (err, result) => {
+        if (err) {
+          console.error("MYSQL ERROR:", err);
+          return res
+            .status(500)
+            .json({ message: "Error al agregar noticia" });
+        }
+        res.json({ message: "Noticia agregada", id: result.insertId });
+      }
+    );
   }
 );
+
 
 // Editar noticia
 app.post("/noticias/edit",
@@ -224,15 +243,25 @@ app.post("/noticias/edit",
   (req, res) => {
     const { id, seccion, titulo, descripcion, imagen_url, fecha } = req.body;
 
+    let fechaFix = null;
+    if (fecha) {
+      const dt = new Date(fecha + "T00:00:00");
+      if (isNaN(dt.getTime())) {
+        return res.status(400).json({ message: "Fecha inválida" });
+      }
+      fechaFix = dt.toISOString().substring(0, 10);
+    }
+
     const sql =
       "UPDATE noticias SET seccion = ?, titulo = ?, descripcion = ?, imagen_url = ?, fecha = ? WHERE id = ?";
 
-    db.query(sql, [seccion, titulo, descripcion, imagen_url, fecha, id], (err) => {
+    db.query(sql, [seccion, titulo, descripcion, imagen_url, fechaFix, id], (err) => {
       if (err) return res.status(500).json({ message: "Error al editar noticia" });
       res.json({ message: "Noticia actualizada" });
     });
   }
 );
+
 
 // Eliminar noticia
 app.post("/noticias/delete",
@@ -307,4 +336,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
+
 
