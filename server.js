@@ -195,7 +195,7 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
 
 // Obtener noticias
 app.get("/noticias", (req, res) => {
-  const sql = "SELECT * FROM noticias ORDER BY seccion, orden ASC";
+  const sql = "SELECT * FROM noticias ORDER BY orden_seccion ASC, orden ASC";
   db.query(sql, (err, result) => {
     if (err) return res.status(500).json({ message: "Error al obtener noticias" });
     res.json(result);
@@ -282,6 +282,31 @@ app.post("/noticias/reorder",
   }
 );
 
+
+// Reordenar Secciones de Noticias
+app.post("/noticias/reorder-secciones",
+  validarRol(["Administrador", "RH"]),
+  (req, res) => {
+    const { sections } = req.body;
+    // sections = [ { seccion: "A", orden_seccion: 0 }, ... ]
+
+    const queries = sections.map(s => 
+      db.promise().query(
+        "UPDATE noticias SET orden_seccion = ? WHERE seccion = ?",
+        [s.orden_seccion, s.seccion]
+      )
+    );
+
+    Promise.all(queries)
+      .then(() => res.json({ message: "Orden de secciones actualizado" }))
+      .catch(err => {
+        console.error(err);
+        res.status(500).json({ message: "Error al actualizar secciones" });
+      });
+  }
+);
+
+
 // Subir imagen noticia por FTP
 app.post("/upload-noticia", upload.single("imagen"), async (req, res) => {
   try {
@@ -322,6 +347,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
+
 
 
 
