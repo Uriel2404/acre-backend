@@ -204,12 +204,14 @@ app.get("/noticias", (req, res) => {
 app.post("/noticias/add",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
-    const { seccion, titulo, descripcion, imagen_url, fecha } = req.body;
+    // Evita que MySQL convierta fechas por zona horaria
+    const fechaFix =
+      fecha ? new Date(fecha + "T00:00").toISOString().substring(0, 10) : null;
 
     const sql =
       "INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha) VALUES (?, ?, ?, ?, ?)";
 
-    db.query(sql, [seccion, titulo, descripcion, imagen_url, fecha], (err, result) => {
+    db.query(sql, [seccion, titulo, descripcion, imagen_url, fechaFix], (err, result) => {
       if (err) return res.status(500).json({ message: "Error al agregar noticia" });
       res.json({ message: "Noticia agregada", id: result.insertId });
     });
@@ -305,3 +307,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
+
