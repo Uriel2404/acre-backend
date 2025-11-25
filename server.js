@@ -385,7 +385,11 @@ app.get("/documents", async (req, res) => {
 });
 
 // RUTA: subir archivo (usa FTP y guarda metadata). Permisos: validarRol(["Administrador","RH"])
-app.post("/documents/upload", validarRol(["Administrador","RH"]), upload.single("file"), async (req, res) => {
+app.post(
+  "/documents/upload",
+  upload.single("file"),             // PRIMERO multer
+  validarRol(["Administrador", "RH"]), // DESPUÉS validar rol
+  async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
 
@@ -496,6 +500,7 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
     res.json({ message: "Documento actualizado" });
   });
 });
+
 
 
 
