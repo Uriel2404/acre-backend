@@ -349,6 +349,153 @@ app.listen(PORT, () => {
 });
 
 
+// ======================================
+//  APARTADO PARA LA SUBIDA DE DOCUMENTOS
+// ======================================  
+// RUTA: listar documentos (filtros + buscador)
+app.get("/documents", async (req, res) => {
+  try {
+    // query params: category, department, q (search)
+    const { category, department, q } = req.query;
+    let sql = "SELECT * FROM documents WHERE 1=1";
+    const params = [];
+
+    if (category) {
+      sql += " AND category = ?";
+      params.push(category);
+    }
+    if (department) {
+      sql += " AND department = ?";
+      params.push(department);
+    }
+    if (q) {
+      sql += " AND (name LIKE ? OR filename LIKE ? OR mime LIKE ?)";
+      const like = `%${q}%`;
+      params.push(like, like, like);
+    }
+
+    sql += " ORDER BY category, orden, created_at DESC";
+    db.query(sql, params, (err, results) => {
+      if (err) { console.error(err); return res.status(500).json({ message: "Error al obtener documentos" }); }
+      res.json(results);
+    });
+  } catch (err) {
+    console.error(err); res.status(500).json({ message: "Error" });
+  }
+});
+
+// RUTA: subir archivo (usa FTP y guarda metadata). Permisos: validarRol(["Administrador","RH"])
+app.post("/documents/upload", validarRol(["Administrador","RH"]), upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+
+    const { category, department, name } = req.body; // name opcional (titulo legible)
+    const localPath = req.file.path;
+    const timestamp = Date.now();
+    const sanitized = req.file.originalname.replace(/\s+/g, "_");
+    const remoteFilename = `${timestamp}_${sanitized}`;
+    // FTP path: /public_html/Intranet/documents/{category}/{department}/
+    const safeCategory = (category || "otros").replace(/\s+/g, "_");
+    const safeDept = (department || "general").replace(/\s+/g, "_");
+    const remoteDir = `/public_html/Intranet/documents/${safeCategory}/${safeDept}`;
+
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false
+    });
+
+    await client.ensureDir(remoteDir);
+    await client.uploadFrom(localPath, `${remoteDir}/${remoteFilename}`);
+    client.close();
+
+    const url = `https://acre.mx/Intranet/documents/${safeCategory}/${safeDept}/${remoteFilename}`;
+
+    // guardar metadata en MySQL
+    const sql = "INSERT INTO documents (name, filename, category, department, url, mime, size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    const params = [
+      name || req.file.originalname,
+      remoteFilename,
+      category || "Otros",
+      department || "General",
+      url,
+      req.file.mimetype,
+      req.file.size,
+      req.body.uploaded_by || null
+    ];
+
+    db.query(sql, params, (err, result) => {
+      fs.unlinkSync(localPath); // borrar temp
+      if (err) { console.error(err); return res.status(500).json({ message: "Error guardando en BD" }); }
+      res.json({ message: "Archivo subido", id: result.insertId, url });
+    });
+
+  } catch (err) {
+    console.error("UPLOAD DOCUMENT ERROR:", err);
+    res.status(500).json({ message: "Error al subir documento" });
+  }
+});
+
+// RUTA: eliminar documento (body: id, rol). validarRol(["Administrador","RH"])
+app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ message: "Falta id" });
+
+    // obtener registro
+    db.query("SELECT * FROM documents WHERE id = ?", [id], async (err, rows) => {
+      if (err) { console.error(err); return res.status(500).json({ message: "Error" }); }
+      if (!rows.length) return res.status(404).json({ message: "No encontrado" });
+      const doc = rows[0];
+
+      // borrar archivo por FTP
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      // construye remote path desde la url o filename
+      // supongamos /public_html/Intranet/documents/{category}/{department}/{filename}
+      const safeCategory = (doc.category || "otros").replace(/\s+/g, "_");
+      const safeDept = (doc.department || "general").replace(/\s+/g, "_");
+      const remotePath = `/public_html/Intranet/documents/${safeCategory}/${safeDept}/${doc.filename}`;
+
+      try {
+        await client.remove(remotePath);
+      } catch (e) {
+        // no abortamos si no se pudo borrar el archivo (sigue borrando BD)
+        console.warn("No se pudo borrar remoto:", e.message);
+      }
+      client.close();
+
+      db.query("DELETE FROM documents WHERE id = ?", [id], (err2) => {
+        if (err2) { console.error(err2); return res.status(500).json({ message: "Error borrando BD" }); }
+        res.json({ message: "Documento eliminado" });
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error" });
+  }
+});
+
+// RUTA: editar metadata (renombrar, mover depto/categoria) - validarRol
+app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
+  const { id, name, category, department } = req.body;
+  if (!id) return res.status(400).json({ message: "Falta id" });
+
+  // Si category/department cambian deberíamos mover archivo en FTP (opcional).
+  // Aquí asumimos solo actualizamos metadata y dejamos archivo donde está.
+  db.query("UPDATE documents SET name = ?, category = ?, department = ?, updated_at = NOW() WHERE id = ?", [name, category, department, id], (err) => {
+    if (err) { console.error(err); return res.status(500).json({ message: "Error actualizando" }); }
+    res.json({ message: "Documento actualizado" });
+  });
+});
 
 
 
