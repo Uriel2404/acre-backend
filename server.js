@@ -587,7 +587,7 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
 
     let fotoUrl = foto_actual || null;
 
-    // SI SUBE UNA NUEVA FOTO → SUBIR A FTP
+    // Si sube nueva foto → subir al FTP
     if (req.file) {
       const localPath = req.file.path;
       const fileName = Date.now() + "_" + req.file.originalname;
@@ -609,15 +609,15 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
       fs.unlinkSync(localPath);
     }
 
-    // ACTUALIZAR MYSQL
+    // Actualizar MySQL
     await db.promise().query(
       `UPDATE empleados 
-       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=?
-       WHERE id=?`,
+       SET nombre = ?, puesto = ?, correo = ?, telefono = ?, departamento = ?, foto = ?
+       WHERE id = ?`,
       [nombre, puesto, correo, telefono, departamento, fotoUrl, id]
     );
 
-    res.json({ success: true, message: "Empleado actualizado correctamente" });
+    res.json({ success: true, message: "Empleado actualizado correctamente", foto: fotoUrl });
 
   } catch (err) {
     console.error("ERROR EDITAR EMPLEADO:", err);
@@ -737,6 +737,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
