@@ -505,7 +505,6 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
 // ========================
 // EMPLEADOS DIRECTORIO
 // ========================
-import multer from "multer";
 import path from "path";
 
 // Carpeta para guardar fotos de empleados
@@ -659,4 +658,5 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
