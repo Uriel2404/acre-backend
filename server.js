@@ -520,11 +520,15 @@ const storageEmpleados = multer.diskStorage({
 const uploadEmpleado = multer({ storage: storageEmpleados });
 
 // =================
-// CREAR EMPLEADOS
+// CREAR EMPLEADO
 // =================
-app.post("/empleados", async (req, res) => {
+app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento, foto } = req.body;
+        const { nombre, puesto, correo, telefono, departamento } = req.body;
+
+        const foto = req.file
+            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
+            : null;
 
         await db.query(
             "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
@@ -537,6 +541,7 @@ app.post("/empleados", async (req, res) => {
         res.status(500).json({ error: "Error al crear empleado" });
     }
 });
+
 
 
 // =================
@@ -652,6 +657,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
