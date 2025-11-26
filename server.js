@@ -502,5 +502,160 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
 });
 
 
+// ========================
+// EMPLEADOS DIRECTORIO
+// ========================
+const multer = require("multer");
+const path = require("path");
+
+// Carpeta para guardar fotos de empleados
+const storageEmpleados = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, "/home/acremx/public_html/Intranet/empleados");
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const uploadEmpleado = multer({ storage: storageEmpleados });
+
+// =================
+// CREAR EMPLEADOS
+// =================
+app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
+    try {
+        const { nombre, puesto, correo, telefono, departamento } = req.body;
+
+        const foto = req.file
+            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
+            : null;
+
+        await db.query(
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
+            [nombre, puesto, correo, telefono, departamento, foto]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error al crear empleado" });
+    }
+});
+
+// =================
+// OBTENER EMPLEADOS
+// =================
+
+app.get("/empleados", async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM empleados ORDER BY nombre ASC");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: "Error al obtener empleados" });
+    }
+});
+
+// =================
+// EDITAR EMPLEADOS
+// =================
+app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
+    try {
+        const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
+        const id = req.params.id;
+
+        const fotoNueva = req.file
+            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
+            : foto_actual;
+
+        await db.query(
+            "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
+            [nombre, puesto, correo, telefono, departamento, fotoNueva, id]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error al actualizar empleado" });
+    }
+});
 
 
+// =================
+// ELIMINAR EMPLEADOS
+// =================
+
+app.delete("/empleados/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        await db.query("DELETE FROM empleados WHERE id=?", [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Error al eliminar empleado" });
+    }
+});
+
+
+
+// ========================
+// ORGANIGRAMAS
+// ========================
+const storageOrganigramas = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, "/home/acremx/public_html/Intranet/organigramas");
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const uploadOrganigrama = multer({ storage: storageOrganigramas });
+
+// ==============================
+// SUBIR O REEMPLAZAR ORGANIGRAMA
+// ==============================
+app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req, res) => {
+    try {
+        const { departamento } = req.body;
+
+        const archivo = `https://acre.mx/Intranet/organigramas/${req.file.filename}`;
+
+        // Si ya existe, se reemplaza
+        await db.query(
+            `INSERT INTO organigramas (departamento, archivo)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`
+        , [departamento, archivo]);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ error: "Error al subir organigrama" });
+    }
+});
+
+// ====================
+// LISTAR ORGANIGRAMAS
+// ====================
+
+app.get("/organigramas", async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM organigramas ORDER BY departamento ASC");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: "Error al obtener organigramas" });
+    }
+});
+
+// =====================
+// ELIMINAR ORGANIGRAMA
+// =====================
+app.delete("/organigramas/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        await db.query("DELETE FROM organigramas WHERE id=?", [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Error al eliminar organigrama" });
+    }
+});
