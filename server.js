@@ -505,8 +505,8 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
 // ========================
 // EMPLEADOS DIRECTORIO
 // ========================
-const multer = require("multer");
-const path = require("path");
+import multer from "multer";
+import path from "path";
 
 // Carpeta para guardar fotos de empleados
 const storageEmpleados = multer.diskStorage({
@@ -659,3 +659,4 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
