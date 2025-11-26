@@ -522,13 +522,9 @@ const uploadEmpleado = multer({ storage: storageEmpleados });
 // =================
 // CREAR EMPLEADOS
 // =================
-app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
+app.post("/empleados", async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento } = req.body;
-
-        const foto = req.file
-            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
-            : null;
+        const { nombre, puesto, correo, telefono, departamento, foto } = req.body;
 
         await db.query(
             "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
@@ -541,6 +537,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
         res.status(500).json({ error: "Error al crear empleado" });
     }
 });
+
 
 // =================
 // OBTENER EMPLEADOS
@@ -558,18 +555,14 @@ app.get("/empleados", async (req, res) => {
 // =================
 // EDITAR EMPLEADOS
 // =================
-app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
+app.put("/empleados/:id", async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
+        const { nombre, puesto, correo, telefono, departamento, foto } = req.body;
         const id = req.params.id;
-
-        const fotoNueva = req.file
-            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
-            : foto_actual;
 
         await db.query(
             "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
-            [nombre, puesto, correo, telefono, departamento, fotoNueva, id]
+            [nombre, puesto, correo, telefono, departamento, foto, id]
         );
 
         res.json({ success: true });
@@ -578,6 +571,7 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
         res.status(500).json({ error: "Error al actualizar empleado" });
     }
 });
+
 
 
 // =================
@@ -658,5 +652,6 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
