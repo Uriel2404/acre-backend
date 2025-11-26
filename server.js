@@ -583,24 +583,45 @@ app.get("/empleados", async (req, res) => {
 app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { id } = req.params;
+    const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
 
-    const { nombre, puesto, correo, telefono, departamento } = req.body;
+    let fotoUrl = foto_actual || null;
 
-    let fotoPath = req.body.foto_actual || null;
-
+    // SI SUBE UNA NUEVA FOTO → SUBIR A FTP
     if (req.file) {
-      fotoPath = `/Intranet/empleados/${req.file.filename}`;
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname;
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/empleados");
+      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
+      client.close();
+
+      fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
+
+      fs.unlinkSync(localPath);
     }
 
+    // ACTUALIZAR MYSQL
     await db.promise().query(
-      "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
-      [nombre, puesto, correo, telefono, departamento, fotoPath, id]
+      `UPDATE empleados 
+       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=?
+       WHERE id=?`,
+      [nombre, puesto, correo, telefono, departamento, fotoUrl, id]
     );
 
-    res.json({ message: "Empleado actualizado" });
+    res.json({ success: true, message: "Empleado actualizado correctamente" });
+
   } catch (err) {
     console.error("ERROR EDITAR EMPLEADO:", err);
-    res.status(500).json({ error: "Error al actualizar empleado" });
+    res.status(500).json({ error: "Error al editar empleado" });
   }
 });
 
@@ -716,6 +737,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
