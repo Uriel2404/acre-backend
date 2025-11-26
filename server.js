@@ -528,7 +528,6 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
 
     let fotoUrl = null;
 
-    // Si se subió una foto, manejar FTP
     if (req.file) {
       const localPath = req.file.path;
       const fileName = Date.now() + "_" + req.file.originalname;
@@ -547,7 +546,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
 
       fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
 
-      fs.unlinkSync(localPath); // borrar archivo temporal
+      fs.unlinkSync(localPath);
     }
 
     await db.promise().query(
@@ -563,7 +562,6 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
   }
 });
 
-
 // ========================
 // EDITAR EMPLEADO
 // ========================
@@ -572,9 +570,9 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
     const id = req.params.id;
 
-    let fotoFinal = foto_actual; // mantener foto si no suben nueva
+    let fotoFinal = foto_actual;
 
-    // Si suben nueva foto → subirla por FTP
+    // SI SUBIERON FOTO → SUBIR POR FTP
     if (req.file) {
       const localPath = req.file.path;
       const fileName = Date.now() + "_" + req.file.originalname;
@@ -597,7 +595,7 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     }
 
     await db.promise().query(
-      "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
+      "UPDATE empleados SET nombre = ?, puesto = ?, correo = ?, telefono = ?, departamento = ?, foto = ? WHERE id = ?",
       [nombre, puesto, correo, telefono, departamento, fotoFinal, id]
     );
 
@@ -605,7 +603,7 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
 
   } catch (err) {
     console.error("ERROR EDITAR EMPLEADO:", err);
-    res.status(500).json({ error: "Error al actualizar empleado" });
+    res.status(500).json({ error: "Error al editar empleado" });
   }
 });
 
@@ -721,6 +719,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
