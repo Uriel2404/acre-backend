@@ -530,7 +530,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
             ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
             : null;
 
-        await db.query(
+        await db.promise().query(
             "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
             [nombre, puesto, correo, telefono, departamento, foto]
         );
@@ -542,17 +542,17 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     }
 });
 
-
-
 // =================
 // OBTENER EMPLEADOS
 // =================
-
 app.get("/empleados", async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM empleados ORDER BY nombre ASC");
+        const [rows] = await db.promise().query(
+            "SELECT * FROM empleados ORDER BY nombre ASC"
+        );
         res.json(rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Error al obtener empleados" });
     }
 });
@@ -560,14 +560,18 @@ app.get("/empleados", async (req, res) => {
 // =================
 // EDITAR EMPLEADOS
 // =================
-app.put("/empleados/:id", async (req, res) => {
+app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento, foto } = req.body;
+        const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
         const id = req.params.id;
 
-        await db.query(
+        const fotoNueva = req.file
+            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
+            : foto_actual;
+
+        await db.promise().query(
             "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
-            [nombre, puesto, correo, telefono, departamento, foto, id]
+            [nombre, puesto, correo, telefono, departamento, fotoNueva, id]
         );
 
         res.json({ success: true });
@@ -577,23 +581,19 @@ app.put("/empleados/:id", async (req, res) => {
     }
 });
 
-
-
 // =================
 // ELIMINAR EMPLEADOS
 // =================
-
 app.delete("/empleados/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        await db.query("DELETE FROM empleados WHERE id=?", [id]);
+        await db.promise().query("DELETE FROM empleados WHERE id=?", [id]);
         res.json({ success: true });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Error al eliminar empleado" });
     }
 });
-
-
 
 // ========================
 // ORGANIGRAMAS
@@ -618,12 +618,12 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
 
         const archivo = `https://acre.mx/Intranet/organigramas/${req.file.filename}`;
 
-        // Si ya existe, se reemplaza
-        await db.query(
+        await db.promise().query(
             `INSERT INTO organigramas (departamento, archivo)
              VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`
-        , [departamento, archivo]);
+             ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
+            [departamento, archivo]
+        );
 
         res.json({ success: true });
     } catch (err) {
@@ -635,12 +635,14 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
 // ====================
 // LISTAR ORGANIGRAMAS
 // ====================
-
 app.get("/organigramas", async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM organigramas ORDER BY departamento ASC");
+        const [rows] = await db.promise().query(
+            "SELECT * FROM organigramas ORDER BY departamento ASC"
+        );
         res.json(rows);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Error al obtener organigramas" });
     }
 });
@@ -651,12 +653,14 @@ app.get("/organigramas", async (req, res) => {
 app.delete("/organigramas/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        await db.query("DELETE FROM organigramas WHERE id=?", [id]);
+        await db.promise().query("DELETE FROM organigramas WHERE id=?", [id]);
         res.json({ success: true });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
