@@ -30,6 +30,8 @@ app.use(cors({
 
 app.use(express.json());
 
+app.use(express.urlencoded({ extended: true }));
+
 // ======================
 //  MySQL Connection Pool
 // ======================
@@ -44,6 +46,13 @@ const db = mysql.createPool({
   queueLimit: 0,
   dateStrings: true
 });
+
+
+
+
+
+
+
 
 
 // ======================
@@ -712,6 +721,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
