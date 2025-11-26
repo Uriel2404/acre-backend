@@ -577,6 +577,38 @@ app.get("/empleados", async (req, res) => {
 });
 
 
+// =================
+// CREAR EMPLEADO
+// =================
+app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
+    try {
+        const { nombre, puesto, correo, telefono, departamento } = req.body;
+
+        if (!nombre || !puesto) {
+            return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
+        }
+
+        // Si sube foto, úsala. Si no, null.
+        const fotoNueva = req.file
+            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
+            : null;
+
+        await db.query(
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
+            [nombre, puesto, correo, telefono, departamento, fotoNueva]
+        );
+
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error("Error al crear empleado:", err);
+        res.status(500).json({ error: "Error al crear empleado" });
+    }
+});
+
+
+
+
 // =====================================
 // EDITAR EMPLEADO
 // =====================================
@@ -624,6 +656,9 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     res.status(500).json({ error: "Error al editar empleado" });
   }
 });
+
+
+
 
 
 
@@ -738,6 +773,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
