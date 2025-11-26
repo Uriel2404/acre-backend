@@ -609,11 +609,11 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
       fs.unlinkSync(localPath);
     }
 
-    // Actualizar MySQL
+    // Actualizar DB
     await db.promise().query(
       `UPDATE empleados 
-       SET nombre = ?, puesto = ?, correo = ?, telefono = ?, departamento = ?, foto = ?
-       WHERE id = ?`,
+       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=?
+       WHERE id=?`,
       [nombre, puesto, correo, telefono, departamento, fotoUrl, id]
     );
 
@@ -624,6 +624,7 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     res.status(500).json({ error: "Error al editar empleado" });
   }
 });
+
 
 
 // ========================
@@ -737,6 +738,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
