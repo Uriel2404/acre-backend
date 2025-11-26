@@ -503,97 +503,149 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
 
 
 // ========================
-// EMPLEADOS DIRECTORIO
+// EMPLEADOS (CON FTP)
 // ========================
-import path from "path";
-
-// Carpeta para guardar fotos de empleados
-const storageEmpleados = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "/home/acremx/public_html/Intranet/empleados");
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+const uploadEmpleado = multer({
+  dest: "/tmp",
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-const uploadEmpleado = multer({ storage: storageEmpleados });
-
-// =================
+// ========================
 // CREAR EMPLEADO
-// =================
+// ========================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
-    try {
-        const { nombre, puesto, correo, telefono, departamento } = req.body;
+  try {
+    const { nombre, puesto, correo, telefono, departamento } = req.body;
 
-        const foto = req.file
-            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
-            : null;
+    let fotoUrl = null;
 
-        await db.promise().query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
-            [nombre, puesto, correo, telefono, departamento, foto]
-        );
+    // Si se subió una foto, manejar FTP
+    if (req.file) {
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname;
 
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al crear empleado" });
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/empleados");
+      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
+      client.close();
+
+      fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
+
+      fs.unlinkSync(localPath); // borrar archivo temporal
     }
+
+    await db.promise().query(
+      "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
+      [nombre, puesto, correo, telefono, departamento, fotoUrl]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("ERROR CREAR EMPLEADO:", err);
+    res.status(500).json({ error: "Error al crear empleado" });
+  }
 });
 
-// =================
-// OBTENER EMPLEADOS
-// =================
-app.get("/empleados", async (req, res) => {
-    try {
-        const [rows] = await db.promise().query(
-            "SELECT * FROM empleados ORDER BY nombre ASC"
-        );
-        res.json(rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al obtener empleados" });
-    }
-});
 
-// =================
-// EDITAR EMPLEADOS
-// =================
+// ========================
+// EDITAR EMPLEADO
+// ========================
 app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
-    try {
-        const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
-        const id = req.params.id;
+  try {
+    const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
+    const id = req.params.id;
 
-        const fotoNueva = req.file
-            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
-            : foto_actual;
+    let fotoFinal = foto_actual; // mantener foto si no suben nueva
 
-        await db.promise().query(
-            "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
-            [nombre, puesto, correo, telefono, departamento, fotoNueva, id]
-        );
+    // Si suben nueva foto → subirla por FTP
+    if (req.file) {
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname;
 
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al actualizar empleado" });
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/empleados");
+      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
+      client.close();
+
+      fotoFinal = `https://acre.mx/Intranet/empleados/${fileName}`;
+
+      fs.unlinkSync(localPath);
     }
+
+    await db.promise().query(
+      "UPDATE empleados SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=? WHERE id=?",
+      [nombre, puesto, correo, telefono, departamento, fotoFinal, id]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("ERROR EDITAR EMPLEADO:", err);
+    res.status(500).json({ error: "Error al actualizar empleado" });
+  }
 });
 
-// =================
-// ELIMINAR EMPLEADOS
-// =================
+
+// ========================
+// ELIMINAR EMPLEADO
+// ========================
 app.delete("/empleados/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        await db.promise().query("DELETE FROM empleados WHERE id=?", [id]);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al eliminar empleado" });
+  try {
+    const id = req.params.id;
+
+    // Obtener registro
+    const [rows] = await db.promise().query("SELECT foto FROM empleados WHERE id=?", [id]);
+    if (!rows.length) return res.status(404).json({ error: "Empleado no encontrado" });
+
+    const fotoUrl = rows[0].foto;
+
+    // Borrar foto por FTP
+    if (fotoUrl) {
+      try {
+        const filename = fotoUrl.split("/empleados/")[1];
+        const remotePath = `/public_html/Intranet/empleados/${filename}`;
+
+        const client = new ftp.Client();
+        await client.access({
+          host: process.env.FTP_HOST,
+          user: process.env.FTP_USER,
+          password: process.env.FTP_PASS,
+          secure: false
+        });
+
+        await client.remove(remotePath);
+        client.close();
+      } catch (e) {
+        console.warn("No se pudo borrar la foto del FTP:", e.message);
+      }
     }
+
+    // Borrar BD
+    await db.promise().query("DELETE FROM empleados WHERE id=?", [id]);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("ERROR ELIMINAR EMPLEADO:", err);
+    res.status(500).json({ error: "Error al eliminar empleado" });
+  }
 });
+
 
 // ========================
 // ORGANIGRAMAS
@@ -660,6 +712,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
