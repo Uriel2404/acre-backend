@@ -562,6 +562,22 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
   }
 });
 
+
+// =====================================
+// LISTAR EMPLEADOS
+// =====================================
+app.get("/empleados", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query("SELECT * FROM empleados ORDER BY id DESC");
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR LISTAR EMPLEADOS:", err);
+    res.status(500).json({ error: "Error al obtener empleados" });
+  }
+});
+
+
+
 // ========================
 // EDITAR EMPLEADO
 // ========================
@@ -719,6 +735,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
