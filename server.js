@@ -608,47 +608,39 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
 
 
 
-
 // =====================================
 // EDITAR EMPLEADO
 // =====================================
-app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
+app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
 
     let fotoUrl = foto_actual || null;
 
-    // Si sube nueva foto → intentamos subir al FTP
+    // Si sube nueva foto → subir al FTP
     if (req.file) {
-      try {
-        const localPath = req.file.path;
-        const fileName = Date.now() + "_" + req.file.originalname;
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname;
 
-        const client = new ftp.Client();
-        await client.access({
-          host: process.env.FTP_HOST,
-          user: process.env.FTP_USER,
-          password: process.env.FTP_PASS,
-          secure: false
-        });
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
 
-        await client.ensureDir("/public_html/Intranet/empleados");
-        await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
-        client.close();
+      await client.ensureDir("/public_html/Intranet/empleados");
+      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
+      client.close();
 
-        fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
+      fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
 
-        fs.unlinkSync(localPath); // borrar temporal
-
-      } catch (ftpErr) {
-        console.error("FTP ERROR:", ftpErr);
-        // Si falla FTP, mantenemos la foto actual
-        fotoUrl = foto_actual || null;
-      }
+      fs.unlinkSync(localPath);
     }
 
-    // Actualizar la base de datos
+    // Actualizar DB
     await db.promise().query(
       `UPDATE empleados 
        SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=?
@@ -663,7 +655,6 @@ app.put("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     res.status(500).json({ error: "Error al editar empleado" });
   }
 });
-
 
 // ========================
 // ELIMINAR EMPLEADO
@@ -776,6 +767,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
