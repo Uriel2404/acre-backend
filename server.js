@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
@@ -704,93 +705,55 @@ app.post("/empleados/delete/:id", async (req, res) => {
 
 
 // ========================
-// ORGANIGRAMAS
+// ORGANIGRAMAS (FTP)
 // ========================
-const storageOrganigramas = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "/tmp");  // en Render se puede escribir aquí
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-
+const uploadOrganigrama = multer({ dest: "/tmp" }); // Guardamos temporalmente en /tmp
 
 // ==============================
 // SUBIR O REEMPLAZAR ORGANIGRAMA
 // ==============================
-import path from "path";
-
-
-
-const uploadOrganigrama = multer({
-  dest: "/tmp", // temporal
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-});
-
-// Subir organigrama
 app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No se envió imagen" });
-
-    const { departamento } = req.body;
-
-    // Nombre único
-    const fileName = Date.now() + path.extname(req.file.originalname);
-    const localPath = req.file.path;
-    const remotePath = `/home/acremx/public_html/Intranet/organigramas/${fileName}`;
-
-    // Mover archivo desde /tmp a carpeta final
-    fs.renameSync(localPath, remotePath);
-
-    // URL accesible públicamente
-    const archivo = `https://acre.mx/Intranet/organigramas/${fileName}`;
-
-    // Guardar en BD (si existe, reemplaza)
-    await db.promise().query(
-      `INSERT INTO organigramas (departamento, archivo)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
-      [departamento, archivo]
-    );
-
-    res.json({ success: true, url: archivo });
-
-  } catch (err) {
-    console.error("ERROR SUBIR ORGANIGRAMA:", err);
-    res.status(500).json({ error: "Error al subir organigrama" });
-  }
-});
-
-// ====================
-// LISTAR ORGANIGRAMAS
-// ====================
-app.get("/organigramas", async (req, res) => {
     try {
-        const [rows] = await db.promise().query(
-            "SELECT * FROM organigramas ORDER BY departamento ASC"
+        if (!req.file) return res.status(400).json({ error: "No se envió archivo" });
+
+        const { departamento } = req.body || "General";
+
+        const localPath = req.file.path;
+        const fileName = Date.now() + path.extname(req.file.originalname);
+
+        // Conectar a FTP
+        const client = new ftp.Client();
+        await client.access({
+            host: process.env.FTP_HOST,
+            user: process.env.FTP_USER,
+            password: process.env.FTP_PASS,
+            secure: false
+        });
+
+        await client.ensureDir("/public_html/Intranet/organigramas");
+        await client.uploadFrom(localPath, `/public_html/Intranet/organigramas/${fileName}`);
+        client.close();
+
+        const archivoUrl = `https://acre.mx/Intranet/organigramas/${fileName}`;
+
+        // Guardar en MySQL
+        await db.promise().query(
+            `INSERT INTO organigramas (departamento, archivo)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
+            [departamento, archivoUrl]
         );
-        res.json(rows);
+
+        fs.unlinkSync(localPath); // borrar temporal
+        res.json({ success: true, url: archivoUrl });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al obtener organigramas" });
+        console.error("ERROR SUBIR ORGANIGRAMA:", err);
+        res.status(500).json({ error: "Error al subir organigrama" });
     }
 });
 
-// =====================
-// ELIMINAR ORGANIGRAMA
-// =====================
-app.delete("/organigramas/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        await db.promise().query("DELETE FROM organigramas WHERE id=?", [id]);
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al eliminar organigrama" });
-    }
-});
+
 
 
 
