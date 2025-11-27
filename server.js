@@ -659,9 +659,10 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
 // ========================
 // ELIMINAR EMPLEADO
 // ========================
-app.delete("/empleados/:id", async (req, res) => {
+
+app.post("/empleados/delete/:id", async (req, res) => {
   try {
-    const id = req.params.id;
+    const { id } = req.params;
 
     // Obtener registro
     const [rows] = await db.promise().query("SELECT foto FROM empleados WHERE id=?", [id]);
@@ -767,6 +768,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
