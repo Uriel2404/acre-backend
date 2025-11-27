@@ -754,23 +754,59 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
 });
 
 
+// ============================
+// VER LISTADO DE ORGANIGRAMAS
+// ============================
+app.get("/organigramas", async (req, res) => {
+    try {
+        const [rows] = await db.promise().query("SELECT * FROM organigramas");
+        res.json(rows);
+    } catch (err) {
+        console.error("ERROR LISTANDO ORGANIGRAMAS:", err);
+        res.status(500).json({ error: "Error al obtener organigramas" });
+    }
+});
 
+// ===============================
+// ELIMINAR ORGANIGRAMAS
+// ==============================
+app.delete("/organigramas/:id", async (req, res) => {
+    const { id } = req.params;
 
+    try {
+        // Buscar archivo
+        const [rows] = await db.promise().query(
+            "SELECT archivo FROM organigramas WHERE id = ?",
+            [id]
+        );
 
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Organigrama no encontrado" });
+        }
 
+        const archivoUrl = rows[0].archivo;
+        const fileName = archivoUrl.split("/").pop();
 
+        // Borrar del FTP
+        const client = new ftp.Client();
+        await client.access({
+            host: process.env.FTP_HOST,
+            user: process.env.FTP_USER,
+            password: process.env.FTP_PASS,
+            secure: false
+        });
 
+        await client.remove(`/public_html/Intranet/organigramas/${fileName}`);
+        client.close();
 
+        // Borrar de BD
+        await db.promise().query("DELETE FROM organigramas WHERE id = ?", [id]);
 
+        res.json({ success: true });
 
-
-
-
-
-
-
-
-
-
-
+    } catch (err) {
+        console.error("ERROR ELIMINANDO ORGANIGRAMA:", err);
+        res.status(500).json({ error: "Error eliminando organigrama" });
+    }
+});
 
