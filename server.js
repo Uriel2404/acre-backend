@@ -716,7 +716,6 @@ const storageOrganigramas = multer.diskStorage({
 });
 
 
-const uploadOrganigrama = multer({ storage: storageOrganigramas });
 
 // ==============================
 // SUBIR O REEMPLAZAR ORGANIGRAMA
@@ -792,6 +791,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
