@@ -707,13 +707,14 @@ app.post("/empleados/delete/:id", async (req, res) => {
 // ORGANIGRAMAS
 // ========================
 const storageOrganigramas = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "/home/acremx/public_html/Intranet/organigramas");
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
+  destination: function (req, file, cb) {
+    cb(null, "/tmp");  // en Render se puede escribir aquí
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
 });
+
 
 const uploadOrganigrama = multer({ storage: storageOrganigramas });
 
@@ -721,25 +722,42 @@ const uploadOrganigrama = multer({ storage: storageOrganigramas });
 // SUBIR O REEMPLAZAR ORGANIGRAMA
 // ==============================
 app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req, res) => {
-    try {
-        const { departamento } = req.body;
+  try {
+    if (!req.file) return res.status(400).json({ error: "No se envió archivo" });
 
-        const archivo = `https://acre.mx/Intranet/organigramas/${req.file.filename}`;
+    const { departamento } = req.body;
+    const localPath = req.file.path;
+    const fileName = Date.now() + "_" + req.file.originalname;
 
-        await db.promise().query(
-            `INSERT INTO organigramas (departamento, archivo)
-             VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
-            [departamento, archivo]
-        );
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false,
+    });
 
-        res.json({ success: true });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: "Error al subir organigrama" });
-    }
+    await client.ensureDir("/public_html/Intranet/organigramas");
+    await client.uploadFrom(localPath, `/public_html/Intranet/organigramas/${fileName}`);
+    client.close();
+
+    fs.unlinkSync(localPath);
+
+    const archivo = `https://acre.mx/Intranet/organigramas/${fileName}`;
+
+    await db.promise().query(
+      `INSERT INTO organigramas (departamento, archivo)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
+      [departamento, archivo]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.log("UPLOAD ERROR:", err);
+    res.status(500).json({ error: "Error al subir organigrama" });
+  }
 });
-
 // ====================
 // LISTAR ORGANIGRAMAS
 // ====================
@@ -768,6 +786,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
