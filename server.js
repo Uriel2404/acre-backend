@@ -721,30 +721,34 @@ const uploadOrganigrama = multer({ storage: storageOrganigramas });
 // ==============================
 // SUBIR O REEMPLAZAR ORGANIGRAMA
 // ==============================
+import path from "path";
+
+
+
+const uploadOrganigrama = multer({
+  dest: "/tmp", // temporal
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+// Subir organigrama
 app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No se envió archivo" });
+    if (!req.file) return res.status(400).json({ error: "No se envió imagen" });
 
     const { departamento } = req.body;
+
+    // Nombre único
+    const fileName = Date.now() + path.extname(req.file.originalname);
     const localPath = req.file.path;
-    const fileName = Date.now() + "_" + req.file.originalname;
+    const remotePath = `/home/acremx/public_html/Intranet/organigramas/${fileName}`;
 
-    const client = new ftp.Client();
-    await client.access({
-      host: process.env.FTP_HOST,
-      user: process.env.FTP_USER,
-      password: process.env.FTP_PASS,
-      secure: false,
-    });
+    // Mover archivo desde /tmp a carpeta final
+    fs.renameSync(localPath, remotePath);
 
-    await client.ensureDir("/public_html/Intranet/organigramas");
-    await client.uploadFrom(localPath, `/public_html/Intranet/organigramas/${fileName}`);
-    client.close();
-
-    fs.unlinkSync(localPath);
-
+    // URL accesible públicamente
     const archivo = `https://acre.mx/Intranet/organigramas/${fileName}`;
 
+    // Guardar en BD (si existe, reemplaza)
     await db.promise().query(
       `INSERT INTO organigramas (departamento, archivo)
        VALUES (?, ?)
@@ -752,12 +756,14 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
       [departamento, archivo]
     );
 
-    res.json({ success: true });
+    res.json({ success: true, url: archivo });
+
   } catch (err) {
-    console.log("UPLOAD ERROR:", err);
+    console.error("ERROR SUBIR ORGANIGRAMA:", err);
     res.status(500).json({ error: "Error al subir organigrama" });
   }
 });
+
 // ====================
 // LISTAR ORGANIGRAMAS
 // ====================
@@ -786,6 +792,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error al eliminar organigrama" });
     }
 });
+
 
 
 
