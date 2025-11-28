@@ -14,9 +14,7 @@ const upload = multer({
   dest: "/tmp",
   limits: { fileSize: 5 * 1024 * 1024 } // 5mb
 });
-
 const app = express();
-
 // ======================
 //  CORS
 // ======================
@@ -28,11 +26,8 @@ app.use(cors({
   ],
   methods: ["GET", "POST"],
 }));
-
 app.use(express.json());
-
 app.use(express.urlencoded({ extended: true }));
-
 // ======================
 //  MySQL Connection Pool
 // ======================
@@ -47,15 +42,6 @@ const db = mysql.createPool({
   queueLimit: 0,
   dateStrings: true
 });
-
-
-
-
-
-
-
-
-
 // ======================
 //  Middleware validar rol
 // ======================
@@ -68,14 +54,12 @@ function validarRol(permisos = []) {
     next();
   };
 }
-
 // ======================
 //  Ruta base
 // ======================
 app.get("/", (req, res) => {
   res.send("API Funcionando ✅");
 });
-
 // ======================
 //  LOGIN
 // ======================
@@ -92,16 +76,12 @@ app.post("/login", async (req, res) => {
       console.error("ERROR MYSQL:", err);
       return res.status(500).json({ message: "Error en el servidor" });
     }
-
     if (result.length === 0)
       return res.status(401).json({ message: "Credenciales incorrectas" });
-
     const user = result[0];
-
     if (password !== user.password) {
       return res.status(401).json({ message: "Credenciales incorrectas" });
     }
-
     res.json({ message: "Login exitoso", user });
   });
 });
@@ -118,7 +98,6 @@ app.get("/carrusel", (req, res) => {
     res.json(result);
   });
 });
-
 // Agregar imagen carrusel
 app.post("/carrusel/add", (req, res) => {
   const { imagen_url, titulo, descripcion } = req.body;
@@ -130,7 +109,6 @@ app.post("/carrusel/add", (req, res) => {
     res.json({ message: "Imagen agregada", id: result.insertId });
   });
 });
-
 // Eliminar imagen carrusel
 app.post("/carrusel/delete", (req, res) => {
   const { id } = req.body;
@@ -140,23 +118,19 @@ app.post("/carrusel/delete", (req, res) => {
     res.json({ message: "Imagen eliminada" });
   });
 });
-
 // Reordenar carrusel
 app.post("/carrusel/reorder", (req, res) => {
   const { order } = req.body;
-
   const queries = order.map((item) =>
     db.promise().query("UPDATE carrusel SET orden = ? WHERE id = ?", [
       item.orden,
       item.id,
     ])
   );
-
   Promise.all(queries)
     .then(() => res.json({ message: "Orden actualizado" }))
     .catch(() => res.status(500).json({ message: "Error al reordenar" }));
 });
-
 // Subir imagen carrusel por FTP
 app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
   try {
@@ -165,7 +139,6 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
 
     const localPath = req.file.path;
     const fileName = Date.now() + "_" + req.file.originalname;
-
     const client = new ftp.Client();
     await client.access({
       host: process.env.FTP_HOST,
@@ -173,26 +146,20 @@ app.post("/upload-carrusel", upload.single("imagen"), async (req, res) => {
       password: process.env.FTP_PASS,
       secure: false
     });
-
     await client.ensureDir("/public_html/Intranet/carrusel");
     await client.uploadFrom(localPath, `/public_html/Intranet/carrusel/${fileName}`);
     client.close();
-
     const imageUrl = `https://acre.mx/Intranet/carrusel/${fileName}`;
-
     const sql = "INSERT INTO carrusel (imagen_url) VALUES (?)";
     db.query(sql, [imageUrl], (err, result) => {
       if (err) return res.status(500).json({ message: "Error guardando en MySQL" });
-
       res.json({
         message: "Imagen subida",
         id: result.insertId,
         url: imageUrl
       });
     });
-
     fs.unlinkSync(localPath);
-
   } catch (error) {
     console.error("UPLOAD ERROR:", error);
     res.status(500).json({ message: "Error al subir imagen" });
@@ -211,21 +178,17 @@ app.get("/noticias", (req, res) => {
     res.json(result);
   });
 });
-
 // Agregar noticia
 app.post(
   "/noticias/add",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { seccion, titulo, descripcion, imagen_url, fecha } = req.body;
-
-    // 🚫 NO convertir la fecha
-    // ✔️ Guardarla tal cual llega
+    // NO convertir la fecha
+    // Guardarla tal cual llega
     const fechaFix = fecha || null;
-
     const sql =
       "INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha) VALUES (?, ?, ?, ?, ?)";
-
     db.query(
       sql,
       [seccion, titulo, descripcion, imagen_url, fechaFix],
@@ -239,19 +202,15 @@ app.post(
     );
   }
 );
-
 // Editar noticia
 app.post("/noticias/edit",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { id, seccion, titulo, descripcion, imagen_url, fecha } = req.body;
-
-    // 🚫 NO convertir la fecha
+    // NO convertir la fecha
     const fechaFix = fecha || null;
-
     const sql =
       "UPDATE noticias SET seccion = ?, titulo = ?, descripcion = ?, imagen_url = ?, fecha = ? WHERE id = ?";
-
     db.query(sql, [seccion, titulo, descripcion, imagen_url, fechaFix, id], (err) => {
       if (err) return res.status(500).json({ message: "Error al editar noticia" });
       res.json({ message: "Noticia actualizada" });
@@ -264,7 +223,6 @@ app.post("/noticias/delete",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { id } = req.body;
-
     const sql = "DELETE FROM noticias WHERE id = ?";
     db.query(sql, [id], (err) => {
       if (err) return res.status(500).json({ message: "Error al eliminar noticia" });
@@ -272,41 +230,34 @@ app.post("/noticias/delete",
     });
   }
 );
-
 // Reordenar noticias
 app.post("/noticias/reorder",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { order } = req.body;
-
     const updates = order.map((item) =>
       db.promise().query(
         "UPDATE noticias SET orden = ? WHERE id = ?",
         [item.orden, item.id]
       )
     );
-
     Promise.all(updates)
       .then(() => res.json({ message: "Orden actualizado" }))
       .catch(() => res.status(500).json({ message: "Error al reordenar" }));
   }
 );
-
-
 // Reordenar Secciones de Noticias
 app.post("/noticias/reorder-secciones",
   validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { sections } = req.body;
     // sections = [ { seccion: "A", orden_seccion: 0 }, ... ]
-
     const queries = sections.map(s => 
       db.promise().query(
         "UPDATE noticias SET orden_seccion = ? WHERE seccion = ?",
         [s.orden_seccion, s.seccion]
       )
     );
-
     Promise.all(queries)
       .then(() => res.json({ message: "Orden de secciones actualizado" }))
       .catch(err => {
@@ -315,17 +266,13 @@ app.post("/noticias/reorder-secciones",
       });
   }
 );
-
-
 // Subir imagen noticia por FTP
 app.post("/upload-noticia", upload.single("imagen"), async (req, res) => {
   try {
     if (!req.file)
       return res.status(400).json({ message: "No se envió imagen" });
-
     const localPath = req.file.path;
     const fileName = Date.now() + "_" + req.file.originalname;
-
     const client = new ftp.Client();
     await client.access({
       host: process.env.FTP_HOST,
@@ -333,17 +280,12 @@ app.post("/upload-noticia", upload.single("imagen"), async (req, res) => {
       password: process.env.FTP_PASS,
       secure: false
     });
-
     await client.ensureDir("/public_html/Intranet/noticias");
     await client.uploadFrom(localPath, `/public_html/Intranet/noticias/${fileName}`);
     client.close();
-
     const imageUrl = `https://acre.mx/Intranet/noticias/${fileName}`;
-
     res.json({ message: "Imagen subida", url: imageUrl });
-
     fs.unlinkSync(localPath);
-
   } catch (error) {
     console.log("UPLOAD ERROR:", error);
     res.status(500).json({ message: "Error al subir imagen" });
@@ -359,6 +301,9 @@ app.listen(PORT, () => {
 });
 
 
+// ===============================================================
+//                    D O C U M E N T O S
+// ===============================================================
 // ===============================
 // CONFIGURACIÓN MULTER DOCUMENTOS
 // ===============================
@@ -380,18 +325,14 @@ app.post(
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
-
       const { category, department, name } = req.body;
-
       const localPath = req.file.path;
       const timestamp = Date.now();
       const sanitized = req.file.originalname.replace(/\s+/g, "_");
       const remoteFilename = `${timestamp}_${sanitized}`;
-
       const safeCategory = (category || "otros").replace(/\s+/g, "_");
       const safeDept = (department || "general").replace(/\s+/g, "_");
       const remoteDir = `/public_html/Intranet/documents/${safeCategory}/${safeDept}`;
-
       const client = new ftp.Client();
       await client.access({
         host: process.env.FTP_HOST,
@@ -399,17 +340,13 @@ app.post(
         password: process.env.FTP_PASS,
         secure: false
       });
-
       await client.ensureDir(remoteDir);
       await client.uploadFrom(localPath, `${remoteDir}/${remoteFilename}`);
       client.close();
-
       const url = `https://acre.mx/Intranet/documents/${safeCategory}/${safeDept}/${remoteFilename}`;
-
       const sql = `INSERT INTO documents 
         (name, filename, category, department, url, mime, size, uploaded_by) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-
       const params = [
         name || req.file.originalname,
         remoteFilename,
@@ -420,7 +357,6 @@ app.post(
         req.file.size,
         req.body.uploaded_by || null
       ];
-
       db.query(sql, params, (err, result) => {
         fs.unlinkSync(localPath);
         if (err) {
@@ -429,27 +365,22 @@ app.post(
         }
         res.json({ message: "Archivo subido", id: result.insertId, url });
       });
-
     } catch (err) {
       console.error("UPLOAD DOCUMENT ERROR:", err);
       res.status(500).json({ message: "Error al subir documento" });
     }
   }
 );
-
-
 // RUTA: eliminar documento (body: id, rol). validarRol(["Administrador","RH"])
 app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ message: "Falta id" });
-
     // obtener registro
     db.query("SELECT * FROM documents WHERE id = ?", [id], async (err, rows) => {
       if (err) { console.error(err); return res.status(500).json({ message: "Error" }); }
       if (!rows.length) return res.status(404).json({ message: "No encontrado" });
       const doc = rows[0];
-
       // borrar archivo por FTP
       const client = new ftp.Client();
       await client.access({
@@ -458,13 +389,11 @@ app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, re
         password: process.env.FTP_PASS,
         secure: false
       });
-
       // construye remote path desde la url o filename
       // supongamos /public_html/Intranet/documents/{category}/{department}/{filename}
       const safeCategory = (doc.category || "otros").replace(/\s+/g, "_");
       const safeDept = (doc.department || "general").replace(/\s+/g, "_");
       const remotePath = `/public_html/Intranet/documents/${safeCategory}/${safeDept}/${doc.filename}`;
-
       try {
         await client.remove(remotePath);
       } catch (e) {
@@ -472,7 +401,6 @@ app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, re
         console.warn("No se pudo borrar remoto:", e.message);
       }
       client.close();
-
       db.query("DELETE FROM documents WHERE id = ?", [id], (err2) => {
         if (err2) { console.error(err2); return res.status(500).json({ message: "Error borrando BD" }); }
         res.json({ message: "Documento eliminado" });
@@ -483,12 +411,10 @@ app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, re
     res.status(500).json({ message: "Error" });
   }
 });
-
 // RUTA: editar metadata (renombrar, mover depto/categoria) - validarRol
 app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
   const { id, name, category, department } = req.body;
   if (!id) return res.status(400).json({ message: "Falta id" });
-
   // Si category/department cambian deberíamos mover archivo en FTP (opcional).
   // Aquí asumimos solo actualizamos metadata y dejamos archivo donde está.
   db.query("UPDATE documents SET name = ?, category = ?, department = ?, updated_at = NOW() WHERE id = ?", [name, category, department, id], (err) => {
@@ -496,32 +422,25 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
     res.json({ message: "Documento actualizado" });
   });
 });
-
-
 // ==========================================
 // OBTENER DOCUMENTOS (con filtros opcionales)
 // ==========================================
 app.get("/documents", (req, res) => {
   const { category, department, q } = req.query;
-
   let sql = "SELECT * FROM documents WHERE 1=1";
   let params = [];
-
   if (category && category !== "Todos") {
     sql += " AND category = ?";
     params.push(category);
   }
-
   if (department && department !== "Todos") {
     sql += " AND department = ?";
     params.push(department);
   }
-
   if (q) {
     sql += " AND name LIKE ?";
     params.push(`%${q}%`);
   }
-
   db.query(sql, params, (err, rows) => {
     if (err) {
       console.error("ERROR GET /documents:", err);
@@ -533,15 +452,10 @@ app.get("/documents", (req, res) => {
 
 
 
+// ===============================================================
+//                    E M P L E A D O S
+// ===============================================================
 
-
-
-
-
-
-// ========================
-// EMPLEADOS (CON FTP)
-// ========================
 const uploadEmpleado = multer({
   dest: "/tmp",
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
@@ -553,13 +467,10 @@ const uploadEmpleado = multer({
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { nombre, puesto, correo, telefono, departamento } = req.body;
-
     let fotoUrl = null;
-
     if (req.file) {
       const localPath = req.file.path;
       const fileName = Date.now() + "_" + req.file.originalname;
-
       const client = new ftp.Client();
       await client.access({
         host: process.env.FTP_HOST,
@@ -567,29 +478,22 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
         password: process.env.FTP_PASS,
         secure: false
       });
-
       await client.ensureDir("/public_html/Intranet/empleados");
       await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
       client.close();
-
       fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
-
       fs.unlinkSync(localPath);
     }
-
     await db.promise().query(
       "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
       [nombre, puesto, correo, telefono, departamento, fotoUrl]
     );
-
     res.json({ success: true });
-
   } catch (err) {
     console.error("ERROR CREAR EMPLEADO:", err);
     res.status(500).json({ error: "Error al crear empleado" });
   }
 });
-
 
 // =====================================
 // LISTAR EMPLEADOS
@@ -604,37 +508,29 @@ app.get("/empleados", async (req, res) => {
   }
 });
 
-
 // =================
 // CREAR EMPLEADO
 // =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     try {
         const { nombre, puesto, correo, telefono, departamento } = req.body;
-
         if (!nombre || !puesto) {
             return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
         }
-
         // Si sube foto, úsala. Si no, null.
         const fotoNueva = req.file
             ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
             : null;
-
         await db.query(
             "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
             [nombre, puesto, correo, telefono, departamento, fotoNueva]
         );
-
         res.json({ success: true });
-
     } catch (err) {
         console.error("Error al crear empleado:", err);
         res.status(500).json({ error: "Error al crear empleado" });
     }
 });
-
-
 
 // =====================================
 // EDITAR EMPLEADO
@@ -643,14 +539,11 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
-
     let fotoUrl = foto_actual || null;
-
     // Si sube nueva foto → subir al FTP
     if (req.file) {
       const localPath = req.file.path;
       const fileName = Date.now() + "_" + req.file.originalname;
-
       const client = new ftp.Client();
       await client.access({
         host: process.env.FTP_HOST,
@@ -658,16 +551,12 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
         password: process.env.FTP_PASS,
         secure: false
       });
-
       await client.ensureDir("/public_html/Intranet/empleados");
       await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
       client.close();
-
       fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
-
       fs.unlinkSync(localPath);
     }
-
     // Actualizar DB
     await db.promise().query(
       `UPDATE empleados 
@@ -675,9 +564,7 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
        WHERE id=?`,
       [nombre, puesto, correo, telefono, departamento, fotoUrl, id]
     );
-
     res.json({ success: true, message: "Empleado actualizado correctamente", foto: fotoUrl });
-
   } catch (err) {
     console.error("ERROR EDITAR EMPLEADO:", err);
     res.status(500).json({ error: "Error al editar empleado" });
@@ -687,7 +574,6 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
 // ========================
 // ELIMINAR EMPLEADO
 // ========================
-
 app.post("/empleados/delete/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -695,15 +581,12 @@ app.post("/empleados/delete/:id", async (req, res) => {
     // Obtener registro
     const [rows] = await db.promise().query("SELECT foto FROM empleados WHERE id=?", [id]);
     if (!rows.length) return res.status(404).json({ error: "Empleado no encontrado" });
-
     const fotoUrl = rows[0].foto;
-
     // Borrar foto por FTP
     if (fotoUrl) {
       try {
         const filename = fotoUrl.split("/empleados/")[1];
         const remotePath = `/public_html/Intranet/empleados/${filename}`;
-
         const client = new ftp.Client();
         await client.access({
           host: process.env.FTP_HOST,
@@ -711,19 +594,15 @@ app.post("/empleados/delete/:id", async (req, res) => {
           password: process.env.FTP_PASS,
           secure: false
         });
-
         await client.remove(remotePath);
         client.close();
       } catch (e) {
         console.warn("No se pudo borrar la foto del FTP:", e.message);
       }
     }
-
     // Borrar BD
     await db.promise().query("DELETE FROM empleados WHERE id=?", [id]);
-
     res.json({ success: true });
-
   } catch (err) {
     console.error("ERROR ELIMINAR EMPLEADO:", err);
     res.status(500).json({ error: "Error al eliminar empleado" });
@@ -731,9 +610,10 @@ app.post("/empleados/delete/:id", async (req, res) => {
 });
 
 
-// ========================
-// ORGANIGRAMAS (FTP)
-// ========================
+// ===============================================================
+//                    O R G A N I G R A M A S
+// ===============================================================
+
 const uploadOrganigrama = multer({ dest: "/tmp" }); // Guardamos temporalmente en /tmp
 
 // ==============================
@@ -742,12 +622,9 @@ const uploadOrganigrama = multer({ dest: "/tmp" }); // Guardamos temporalmente e
 app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No se envió archivo" });
-
         const departamento = req.body.departamento || "General";
-
         const localPath = req.file.path;
         const fileName = Date.now() + path.extname(req.file.originalname);
-
         // Conectar a FTP
         const client = new ftp.Client();
         await client.access({
@@ -756,13 +633,10 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
             password: process.env.FTP_PASS,
             secure: false
         });
-
         await client.ensureDir("/public_html/Intranet/organigramas");
         await client.uploadFrom(localPath, `/public_html/Intranet/organigramas/${fileName}`);
         client.close();
-
         const archivoUrl = `https://acre.mx/Intranet/organigramas/${fileName}`;
-
         // Guardar en MySQL
         await db.promise().query(
             `INSERT INTO organigramas (departamento, archivo)
@@ -770,16 +644,13 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
              ON DUPLICATE KEY UPDATE archivo = VALUES(archivo)`,
             [departamento, archivoUrl]
         );
-
         fs.unlinkSync(localPath); // borrar temporal
         res.json({ success: true, url: archivoUrl });
-
     } catch (err) {
         console.error("ERROR SUBIR ORGANIGRAMA:", err);
         res.status(500).json({ error: "Error al subir organigrama" });
     }
 });
-
 
 // ============================
 // VER LISTADO DE ORGANIGRAMAS
@@ -793,27 +664,22 @@ app.get("/organigramas", async (req, res) => {
         res.status(500).json({ error: "Error al obtener organigramas" });
     }
 });
-
 // ===============================
 // ELIMINAR ORGANIGRAMAS
 // ==============================
 app.delete("/organigramas/:id", async (req, res) => {
     const { id } = req.params;
-
     try {
         // Buscar archivo
         const [rows] = await db.promise().query(
             "SELECT archivo FROM organigramas WHERE id = ?",
             [id]
         );
-
         if (rows.length === 0) {
             return res.status(404).json({ error: "Organigrama no encontrado" });
         }
-
         const archivoUrl = rows[0].archivo;
         const fileName = archivoUrl.split("/").pop();
-
         // Borrar del FTP
         const client = new ftp.Client();
         await client.access({
@@ -822,21 +688,14 @@ app.delete("/organigramas/:id", async (req, res) => {
             password: process.env.FTP_PASS,
             secure: false
         });
-
         await client.remove(`/public_html/Intranet/organigramas/${fileName}`);
         client.close();
-
         // Borrar de BD
         await db.promise().query("DELETE FROM organigramas WHERE id = ?", [id]);
-
         res.json({ success: true });
-
     } catch (err) {
         console.error("ERROR ELIMINANDO ORGANIGRAMA:", err);
         res.status(500).json({ error: "Error eliminando organigrama" });
     }
 });
-
-
-
 
