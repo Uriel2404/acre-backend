@@ -359,98 +359,84 @@ app.listen(PORT, () => {
 });
 
 
+// ===============================
+// CONFIGURACIÓN MULTER DOCUMENTOS
+// ===============================
+const uploadDocuments = multer({
+  dest: "/tmp",
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25 MB
+  }
+});
+
 // ======================================
 //  APARTADO PARA LA SUBIDA DE DOCUMENTOS
 // ======================================  
-// RUTA: listar documentos (filtros + buscador)
-app.get("/documents", async (req, res) => {
-  try {
-    // query params: category, department, q (search)
-    const { category, department, q } = req.query;
-    let sql = "SELECT * FROM documents WHERE 1=1";
-    const params = [];
 
-    if (category) {
-      sql += " AND category = ?";
-      params.push(category);
-    }
-    if (department) {
-      sql += " AND department = ?";
-      params.push(department);
-    }
-    if (q) {
-      sql += " AND (name LIKE ? OR filename LIKE ? OR mime LIKE ?)";
-      const like = `%${q}%`;
-      params.push(like, like, like);
-    }
-
-    sql += " ORDER BY category, orden, created_at DESC";
-    db.query(sql, params, (err, results) => {
-      if (err) { console.error(err); return res.status(500).json({ message: "Error al obtener documentos" }); }
-      res.json(results);
-    });
-  } catch (err) {
-    console.error(err); res.status(500).json({ message: "Error" });
-  }
-});
-
-// RUTA: subir archivo (usa FTP y guarda metadata). Permisos: validarRol(["Administrador","RH"])
 app.post(
   "/documents/upload",
-  upload.single("file"),             // PRIMERO multer
-  validarRol(["Administrador", "RH"]), // DESPUÉS validar rol
+  uploadDocuments.single("file"),        // ← USA MULTER CON LÍMITE
+  validarRol(["Administrador", "RH"]),
   async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+    try {
+      if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
 
-    const { category, department, name } = req.body; // name opcional (titulo legible)
-    const localPath = req.file.path;
-    const timestamp = Date.now();
-    const sanitized = req.file.originalname.replace(/\s+/g, "_");
-    const remoteFilename = `${timestamp}_${sanitized}`;
-    // FTP path: /public_html/Intranet/documents/{category}/{department}/
-    const safeCategory = (category || "otros").replace(/\s+/g, "_");
-    const safeDept = (department || "general").replace(/\s+/g, "_");
-    const remoteDir = `/public_html/Intranet/documents/${safeCategory}/${safeDept}`;
+      const { category, department, name } = req.body;
 
-    const client = new ftp.Client();
-    await client.access({
-      host: process.env.FTP_HOST,
-      user: process.env.FTP_USER,
-      password: process.env.FTP_PASS,
-      secure: false
-    });
+      const localPath = req.file.path;
+      const timestamp = Date.now();
+      const sanitized = req.file.originalname.replace(/\s+/g, "_");
+      const remoteFilename = `${timestamp}_${sanitized}`;
 
-    await client.ensureDir(remoteDir);
-    await client.uploadFrom(localPath, `${remoteDir}/${remoteFilename}`);
-    client.close();
+      const safeCategory = (category || "otros").replace(/\s+/g, "_");
+      const safeDept = (department || "general").replace(/\s+/g, "_");
+      const remoteDir = `/public_html/Intranet/documents/${safeCategory}/${safeDept}`;
 
-    const url = `https://acre.mx/Intranet/documents/${safeCategory}/${safeDept}/${remoteFilename}`;
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
 
-    // guardar metadata en MySQL
-    const sql = "INSERT INTO documents (name, filename, category, department, url, mime, size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-    const params = [
-      name || req.file.originalname,
-      remoteFilename,
-      category || "Otros",
-      department || "General",
-      url,
-      req.file.mimetype,
-      req.file.size,
-      req.body.uploaded_by || null
-    ];
+      await client.ensureDir(remoteDir);
+      await client.uploadFrom(localPath, `${remoteDir}/${remoteFilename}`);
+      client.close();
 
-    db.query(sql, params, (err, result) => {
-      fs.unlinkSync(localPath); // borrar temp
-      if (err) { console.error(err); return res.status(500).json({ message: "Error guardando en BD" }); }
-      res.json({ message: "Archivo subido", id: result.insertId, url });
-    });
+      const url = `https://acre.mx/Intranet/documents/${safeCategory}/${safeDept}/${remoteFilename}`;
 
-  } catch (err) {
-    console.error("UPLOAD DOCUMENT ERROR:", err);
-    res.status(500).json({ message: "Error al subir documento" });
+      const sql = `INSERT INTO documents 
+        (name, filename, category, department, url, mime, size, uploaded_by) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+
+      const params = [
+        name || req.file.originalname,
+        remoteFilename,
+        category || "Otros",
+        department || "General",
+        url,
+        req.file.mimetype,
+        req.file.size,
+        req.body.uploaded_by || null
+      ];
+
+      db.query(sql, params, (err, result) => {
+        fs.unlinkSync(localPath);
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ message: "Error guardando en BD" });
+        }
+        res.json({ message: "Archivo subido", id: result.insertId, url });
+      });
+
+    } catch (err) {
+      console.error("UPLOAD DOCUMENT ERROR:", err);
+      res.status(500).json({ message: "Error al subir documento" });
+    }
   }
-});
+);
+
 
 // RUTA: eliminar documento (body: id, rol). validarRol(["Administrador","RH"])
 app.post("/documents/delete", validarRol(["Administrador","RH"]), async (req, res) => {
@@ -809,5 +795,6 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error eliminando organigrama" });
     }
 });
+
 
 
