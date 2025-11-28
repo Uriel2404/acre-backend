@@ -461,53 +461,6 @@ const uploadEmpleado = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// ========================
-// CREAR EMPLEADO
-// ========================
-app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
-  try {
-    const { nombre, puesto, correo, telefono, departamento } = req.body;
-    let fotoUrl = null;
-    if (req.file) {
-      const localPath = req.file.path;
-      const fileName = Date.now() + "_" + req.file.originalname;
-      const client = new ftp.Client();
-      await client.access({
-        host: process.env.FTP_HOST,
-        user: process.env.FTP_USER,
-        password: process.env.FTP_PASS,
-        secure: false
-      });
-      await client.ensureDir("/public_html/Intranet/empleados");
-      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
-      client.close();
-      fotoUrl = `https://acre.mx/Intranet/empleados/${fileName}`;
-      fs.unlinkSync(localPath);
-    }
-    await db.promise().query(
-      "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
-      [nombre, puesto, correo, telefono, departamento, fotoUrl]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    console.error("ERROR CREAR EMPLEADO:", err);
-    res.status(500).json({ error: "Error al crear empleado" });
-  }
-});
-
-// =====================================
-// LISTAR EMPLEADOS
-// =====================================
-app.get("/empleados", async (req, res) => {
-  try {
-    const [rows] = await db.promise().query("SELECT * FROM empleados ORDER BY id DESC");
-    res.json(rows);
-  } catch (err) {
-    console.error("ERROR LISTAR EMPLEADOS:", err);
-    res.status(500).json({ error: "Error al obtener empleados" });
-  }
-});
-
 // =================
 // CREAR EMPLEADO
 // =================
@@ -530,6 +483,19 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
         console.error("Error al crear empleado:", err);
         res.status(500).json({ error: "Error al crear empleado" });
     }
+});
+
+// =====================================
+// LISTAR EMPLEADOS
+// =====================================
+app.get("/empleados", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query("SELECT * FROM empleados ORDER BY id DESC");
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR LISTAR EMPLEADOS:", err);
+    res.status(500).json({ error: "Error al obtener empleados" });
+  }
 });
 
 // =====================================
@@ -698,4 +664,5 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error eliminando organigrama" });
     }
 });
+
 
