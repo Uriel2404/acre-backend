@@ -716,7 +716,7 @@ app.post("/organigramas/upload", uploadOrganigrama.single("archivo"), async (req
     try {
         if (!req.file) return res.status(400).json({ error: "No se envió archivo" });
 
-        const { departamento } = req.body || "General";
+        const departamento = req.body.departamento || "General";
 
         const localPath = req.file.path;
         const fileName = Date.now() + path.extname(req.file.originalname);
@@ -809,4 +809,5 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error eliminando organigrama" });
     }
 });
+
 
