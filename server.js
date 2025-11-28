@@ -498,6 +498,47 @@ app.post("/documents/edit", validarRol(["Administrador","RH"]), (req, res) => {
 });
 
 
+// ==========================================
+// OBTENER DOCUMENTOS (con filtros opcionales)
+// ==========================================
+app.get("/documents", (req, res) => {
+  const { category, department, q } = req.query;
+
+  let sql = "SELECT * FROM documents WHERE 1=1";
+  let params = [];
+
+  if (category && category !== "Todos") {
+    sql += " AND category = ?";
+    params.push(category);
+  }
+
+  if (department && department !== "Todos") {
+    sql += " AND department = ?";
+    params.push(department);
+  }
+
+  if (q) {
+    sql += " AND name LIKE ?";
+    params.push(`%${q}%`);
+  }
+
+  db.query(sql, params, (err, rows) => {
+    if (err) {
+      console.error("ERROR GET /documents:", err);
+      return res.status(500).json({ message: "Error al obtener documentos" });
+    }
+    res.json(rows);
+  });
+});
+
+
+
+
+
+
+
+
+
 // ========================
 // EMPLEADOS (CON FTP)
 // ========================
@@ -795,6 +836,7 @@ app.delete("/organigramas/:id", async (req, res) => {
         res.status(500).json({ error: "Error eliminando organigrama" });
     }
 });
+
 
 
 
