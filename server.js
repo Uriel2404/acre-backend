@@ -666,4 +666,25 @@ app.delete("/organigramas/:id", async (req, res) => {
 });
 
 
+// ===============================
+// ENDPOINT PARA CALENDARIO
+// ===============================
+app.get("/calendar/events", (req, res) => {
+  const sql = `
+    SELECT 
+      id, titulo AS title, fecha, imagen 
+    FROM noticias 
+    ORDER BY fecha ASC
+  `;
+
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error("ERROR AL OBTENER EVENTOS:", err);
+      return res.status(500).json({ message: "Error obteniendo eventos" });
+    }
+
+    res.json(rows);
+  });
+});
+
 
