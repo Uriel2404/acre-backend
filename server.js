@@ -179,36 +179,40 @@ app.get("/noticias", (req, res) => {
   });
 });
 // Agregar noticia
-app.post(
-  "/noticias/add",
-  validarRol(["Administrador", "RH"]),
+app.post("/noticias/add", validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { seccion, titulo, descripcion, imagen_url, fecha } = req.body;
-    // NO convertir la fecha
-    // Guardarla tal cual llega
     const fechaFix = fecha || null;
-    const sql =
-      "INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha) VALUES (?, ?, ?, ?, ?)";
-    db.query(
-      sql,
-      [seccion, titulo, descripcion, imagen_url, fechaFix],
-      (err, result) => {
-        if (err) {
-          console.error("MYSQL ERROR:", err);
-          return res.status(500).json({ message: "Error al agregar noticia" });
-        }
-        res.json({ message: "Noticia agregada", id: result.insertId });
-      }
-    );
-
-    // Después de insertar una noticia:
-    const calendarQuery = `
-      INSERT INTO calendario (noticia_id, title, fecha, imagen)
-      VALUES (?, ?, ?, ?)
+    const sql = `
+      INSERT INTO noticias (seccion, titulo, descripcion, imagen_url, fecha)
+      VALUES (?, ?, ?, ?, ?)
     `;
-    db.query(calendarQuery, [result.insertId, titulo, fecha, imagen]);
+    db.query(sql, [seccion, titulo, descripcion, imagen_url, fechaFix], (err, result) => {
+      if (err) {
+        console.error("MYSQL ERROR:", err);
+        return res.status(500).json({ message: "Error al agregar noticia" });
+      }
+      const noticiaId = result.insertId;
+      // Ahora insertar en el calendario
+      const calendarQuery = `
+        INSERT INTO calendario (noticia_id, title, fecha, imagen)
+        VALUES (?, ?, ?, ?)
+      `;
+      db.query(calendarQuery, [noticiaId, titulo, fechaFix, imagen_url], (err2) => {
+        if (err2) {
+          console.error("CALENDAR ERROR:", err2);
+          return res.status(500).json({ message: "Noticia guardada, pero fallo calendario" });
+        }
+        // ✔ SOLO AQUÍ enviamos respuesta
+        return res.json({
+          message: "Noticia agregada y calendario actualizado",
+          id: noticiaId
+        });
+      });
+    });
   }
 );
+
 // Editar noticia
 app.post("/noticias/edit",
   validarRol(["Administrador", "RH"]),
@@ -693,6 +697,7 @@ app.get("/calendar/events", (req, res) => {
     res.json(rows);
   });
 });
+
 
 
 
