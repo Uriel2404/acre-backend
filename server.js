@@ -200,6 +200,13 @@ app.post(
         res.json({ message: "Noticia agregada", id: result.insertId });
       }
     );
+
+    // Después de insertar una noticia:
+    const calendarQuery = `
+      INSERT INTO calendario (noticia_id, title, fecha, imagen)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.query(calendarQuery, [result.insertId, titulo, fecha, imagen]);
   }
 );
 // Editar noticia
@@ -686,5 +693,6 @@ app.get("/calendar/events", (req, res) => {
     res.json(rows);
   });
 });
+
 
 
