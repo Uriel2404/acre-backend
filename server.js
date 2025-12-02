@@ -678,13 +678,16 @@ app.delete("/organigramas/:id", async (req, res) => {
 
 
 // ===============================
-// ENDPOINT PARA CALENDARIO
+//      C A L E N D A R I O
 // ===============================
 app.get("/calendar/events", (req, res) => {
   const sql = `
     SELECT 
-      id, titulo AS title, fecha, imagen 
-    FROM noticias 
+      id,
+      titulo AS title,
+      fecha AS start,   -- FullCalendar NECESITA "start"
+      imagen
+    FROM noticias
     ORDER BY fecha ASC
   `;
 
@@ -697,7 +700,5 @@ app.get("/calendar/events", (req, res) => {
     res.json(rows);
   });
 });
-
-
 
 
