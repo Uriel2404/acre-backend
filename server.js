@@ -682,22 +682,26 @@ app.delete("/organigramas/:id", async (req, res) => {
 // ===============================
 app.get("/calendar/events", (req, res) => {
   const sql = `
-    SELECT 
-      id,
-      titulo AS title,
-      fecha AS start,   -- FullCalendar NECESITA "start"
-      imagen
+    SELECT id,
+           titulo AS title,
+           DATE_FORMAT(fecha, '%Y-%m-%d') AS start,
+           imagen
     FROM noticias
     ORDER BY fecha ASC
   `;
-
   db.query(sql, (err, rows) => {
     if (err) {
       console.error("ERROR AL OBTENER EVENTOS:", err);
       return res.status(500).json({ message: "Error obteniendo eventos" });
     }
-
-    res.json(rows);
+    // Force: ensure start is string and valid
+    const normalized = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      start: r.start ? String(r.start) : null,
+      imagen: r.imagen || null
+    }));
+    res.json(normalized);
   });
 });
 
