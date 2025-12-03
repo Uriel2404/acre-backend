@@ -701,108 +701,6 @@ app.get("/calendar/events", (req, res) => {
   });
 });
 
-// ===============================
-//      V A C A C I O N E S
-// ===============================
-
-// -----------------------------------------------------
-// 1️⃣ CREAR UNA SOLICITUD DE VACACIONES
-// -----------------------------------------------------
-app.post("/solicitudes/vacaciones", (req, res) => {
-  const { user_id, fecha_inicio, fecha_fin, motivo } = req.body;
-
-  if (!user_id || !fecha_inicio || !fecha_fin) {
-    return res.status(400).json({ error: "Faltan datos obligatorios" });
-  }
-
-  // Calcular días solicitados
-  const diasQuery = `
-    SELECT DATEDIFF(?, ?) + 1 AS dias;
-  `;
-
-  db.query(diasQuery, [fecha_fin, fecha_inicio], (err, diasResult) => {
-    if (err) return res.status(500).json({ error: err });
-
-    const dias_solicitados = diasResult[0].dias;
-
-    const sql = `
-      INSERT INTO solicitudes_vacaciones 
-      (user_id, fecha_inicio, fecha_fin, dias_solicitados, motivo)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-
-    db.query(
-      sql,
-      [user_id, fecha_inicio, fecha_fin, dias_solicitados, motivo || null],
-      (error, result) => {
-        if (error) return res.status(500).json({ error: error });
-        res.json({ message: "Solicitud creada correctamente", id: result.insertId });
-      }
-    );
-  });
-});
-
-
-// -----------------------------------------------------
-// 2️⃣ OBTENER MIS SOLICITUDES
-// -----------------------------------------------------
-app.get("/solicitudes/vacaciones/:user_id", (req, res) => {
-  const { user_id } = req.params;
-
-  const sql = `
-    SELECT * FROM solicitudes_vacaciones 
-    WHERE user_id = ?
-    ORDER BY fecha_solicitud DESC
-  `;
-
-  db.query(sql, [user_id], (error, result) => {
-    if (error) return res.status(500).json({ error: error });
-    res.json(result);
-  });
-});
-
-
-// -----------------------------------------------------
-// 3️⃣ PANEL ADMIN → LISTAR TODAS LAS SOLICITUDES
-// -----------------------------------------------------
-app.get("/admin/solicitudes/vacaciones", (req, res) => {
-  const sql = `
-    SELECT s.*, e.nombre AS empleado
-    FROM solicitudes_vacaciones s
-    LEFT JOIN empleados e ON e.id = s.user_id
-    ORDER BY s.fecha_solicitud DESC
-  `;
-
-  db.query(sql, (error, result) => {
-    if (error) return res.status(500).json({ error: error });
-    res.json(result);
-  });
-});
-
-
-// -----------------------------------------------------
-// 4️⃣ ADMIN → APROBAR O RECHAZAR
-// -----------------------------------------------------
-app.put("/admin/solicitudes/vacaciones/:id", (req, res) => {
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  if (!["aprobado", "rechazado"].includes(estado)) {
-    return res.status(400).json({ error: "Estado inválido" });
-  }
-
-  const sql = `
-    UPDATE solicitudes_vacaciones
-    SET estado = ?
-    WHERE id = ?
-  `;
-
-  db.query(sql, [estado, id], (error, result) => {
-    if (error) return res.status(500).json({ error: error });
-
-    res.json({ message: "Estado actualizado correctamente" });
-  });
-});
 
 // -----------------------------------------------------
 // SERVIDOR
@@ -810,6 +708,149 @@ app.put("/admin/solicitudes/vacaciones/:id", (req, res) => {
 app.listen(3001, () => {
   console.log("Servidor corriendo en http://localhost:3001");
 });
+
+
+
+
+
+// ===============================================================
+//                S O L I C I T U D E S   D E   V A C A C I O N E S
+// ===============================================================
+
+// Crear solicitud de vacaciones
+app.post("/vacaciones/solicitar", (req, res) => {
+  const { empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo } = req.body;
+
+  if (!empleado_id || !fecha_inicio || !fecha_fin) {
+    return res.status(400).json({ message: "Faltan datos obligatorios" });
+  }
+
+  // Validar que no existan solicitudes en las mismas fechas
+  const sqlCheck = `
+    SELECT * FROM vacaciones 
+    WHERE empleado_id = ? 
+    AND (
+      (fecha_inicio <= ? AND fecha_fin >= ?) OR
+      (fecha_inicio <= ? AND fecha_fin >= ?) OR
+      (fecha_inicio >= ? AND fecha_fin <= ?)
+    )
+  `;
+
+  db.query(
+    sqlCheck,
+    [
+      empleado_id,
+      fecha_inicio, fecha_inicio,
+      fecha_fin, fecha_fin,
+      fecha_inicio, fecha_fin
+    ],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: "Error validando fechas" });
+
+      if (rows.length > 0) {
+        return res.status(400).json({ message: "Ya existe una solicitud en esas fechas" });
+      }
+
+      // Insertar solicitud
+      const sqlInsert = `
+        INSERT INTO vacaciones 
+        (empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo, estatus, fecha_solicitud)
+        VALUES (?, ?, ?, ?, ?, 'Pendiente', NOW())
+      `;
+
+      db.query(
+        sqlInsert,
+        [empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo],
+        (err2, result) => {
+          if (err2) return res.status(500).json({ message: "Error al crear solicitud" });
+
+          res.json({
+            message: "Solicitud enviada exitosamente",
+            id: result.insertId
+          });
+        }
+      );
+    }
+  );
+});
+
+// Obtener solicitudes de un empleado (para su panel)
+app.get("/vacaciones/empleado/:id", (req, res) => {
+  const empleado_id = req.params.id;
+
+  const sql = `
+    SELECT * FROM vacaciones 
+    WHERE empleado_id = ?
+    ORDER BY fecha_solicitud DESC
+  `;
+
+  db.query(sql, [empleado_id], (err, rows) => {
+    if (err) return res.status(500).json({ message: "Error al obtener solicitudes" });
+    res.json(rows);
+  });
+});
+
+// Obtener todas las solicitudes (para RH/Administrador)
+app.get("/vacaciones/todas", (req, res) => {
+  const sql = `
+    SELECT * FROM vacaciones 
+    ORDER BY fecha_solicitud DESC
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) return res.status(500).json({ message: "Error al obtener solicitudes" });
+    res.json(rows);
+  });
+});
+
+// Aprobar solicitud
+app.post("/vacaciones/aprobar", validarRol(["Administrador", "RH"]), (req, res) => {
+  const { id } = req.body;
+
+  const sql = `
+    UPDATE vacaciones 
+    SET estatus = 'Aprobada', fecha_respuesta = NOW() 
+    WHERE id = ?
+  `;
+
+  db.query(sql, [id], (err) => {
+    if (err) return res.status(500).json({ message: "Error al aprobar" });
+    res.json({ message: "Solicitud aprobada" });
+  });
+});
+
+// Rechazar solicitud
+app.post("/vacaciones/rechazar", validarRol(["Administrador", "RH"]), (req, res) => {
+  const { id, motivo_rechazo } = req.body;
+
+  const sql = `
+    UPDATE vacaciones 
+    SET estatus = 'Rechazada', motivo_rechazo = ?, fecha_respuesta = NOW() 
+    WHERE id = ?
+  `;
+
+  db.query(sql, [motivo_rechazo, id], (err) => {
+    if (err) return res.status(500).json({ message: "Error al rechazar" });
+    res.json({ message: "Solicitud rechazada" });
+  });
+});
+
+// Cancelar solicitud (empleado)
+app.post("/vacaciones/cancelar", (req, res) => {
+  const { id, empleado_id } = req.body;
+
+  const sql = `
+    UPDATE vacaciones 
+    SET estatus = 'Cancelada' 
+    WHERE id = ? AND empleado_id = ?
+  `;
+
+  db.query(sql, [id, empleado_id], (err) => {
+    if (err) return res.status(500).json({ message: "Error al cancelar solicitud" });
+    res.json({ message: "Solicitud cancelada" });
+  });
+});
+
+
 
 
 
