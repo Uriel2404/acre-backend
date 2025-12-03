@@ -705,45 +705,106 @@ app.get("/calendar/events", (req, res) => {
 //      V A C A C I O N E S
 // ===============================
 
-app.post("/solicitud/vacaciones", (req, res) => {
-  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
+// helpers (agrega arriba junto a otras funciones)
+function calcDiasIncluyendo(fechaInicio, fechaFin) {
+  const a = new Date(fechaInicio);
+  const b = new Date(fechaFin);
+  const diff = Math.floor((b - a) / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(0, diff);
+}
 
-  // Validación rápida
-  if (!empleado_id || !fecha_inicio || !fecha_fin) {
-    return res.json({
-      ok: false,
-      mensaje: "Faltan datos obligatorios"
-    });
-  }
-
-  // Calcular días solicitados
-  const diasSolicitados =
-    Math.floor((new Date(fecha_fin) - new Date(fecha_inicio)) / (1000 * 60 * 60 * 24)) + 1;
-
+// verifica solapamiento de solicitudes del mismo empleado
+// devuelve true si existe solapamiento con solicitudes (Pendiente o Aprobado)
+async function tieneSolapamiento(empleado_id, fechaInicio, fechaFin) {
   const sql = `
-    INSERT INTO solicitudes_vacaciones 
-    (empleado_id, fecha_inicio, fecha_fin, motivo, dias) 
-    VALUES (?, ?, ?, ?, ?)
+    SELECT * FROM solicitudes_vacaciones
+    WHERE empleado_id = ? AND estatus IN ('Pendiente','Aprobado')
+      AND NOT (fecha_fin < ? OR fecha_inicio > ?)
   `;
+  const [rows] = await db.promise().query(sql, [empleado_id, fechaInicio, fechaFin]);
+  return rows.length > 0;
+}
 
-  connection.query(
-    sql,
-    [empleado_id, fecha_inicio, fecha_fin, motivo, diasSolicitados],
-    (err, result) => {
-      if (err) {
-        console.log("ERROR al guardar solicitud:", err);
-        return res.json({
-          ok: false,
-          mensaje: "Error en el servidor"
-        });
-      }
+app.post("/api/solicitudes/vacaciones", async (req, res) => {
+  try {
+    const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
-      res.json({
-        ok: true,
-        mensaje: "Solicitud registrada correctamente",
-        solicitud_id: result.insertId
-      });
+    if (!empleado_id || !fecha_inicio || !fecha_fin) {
+      return res.status(400).json({ ok: false, mensaje: "Faltan datos obligatorios" });
     }
-  );
+
+    // validación fechas
+    const dias = calcDiasIncluyendo(fecha_inicio, fecha_fin);
+    if (dias <= 0) {
+      return res.status(400).json({ ok: false, mensaje: "Fechas inválidas" });
+    }
+
+    // evitar solapamientos
+    const overlap = await tieneSolapamiento(empleado_id, fecha_inicio, fecha_fin);
+    if (overlap) {
+      return res.status(400).json({ ok: false, mensaje: "Ya existe una solicitud en ese rango (Pendiente/Aprobada)" });
+    }
+
+    const sql = `INSERT INTO solicitudes_vacaciones
+      (empleado_id, fecha_inicio, fecha_fin, dias, motivo)
+      VALUES (?, ?, ?, ?, ?)`;
+
+    const [result] = await db.promise().query(sql, [empleado_id, fecha_inicio, fecha_fin, dias, motivo || null]);
+
+    res.json({ ok: true, mensaje: "Solicitud registrada", id: result.insertId, dias });
+  } catch (err) {
+    console.error("ERROR /api/solicitudes/vacaciones:", err);
+    res.status(500).json({ ok: false, mensaje: "Error en servidor" });
+  }
+});
+
+app.get("/api/solicitudes/vacaciones", async (req, res) => {
+  try {
+    const { empleado_id } = req.query;
+    let sql = "SELECT * FROM solicitudes_vacaciones";
+    const params = [];
+    if (empleado_id) {
+      sql += " WHERE empleado_id = ?";
+      params.push(empleado_id);
+    }
+    sql += " ORDER BY fecha_solicitud DESC";
+    const [rows] = await db.promise().query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR GET /api/solicitudes/vacaciones:", err);
+    res.status(500).json({ message: "Error obteniendo solicitudes" });
+  }
+});
+
+app.post("/api/solicitudes/vacaciones/:id/accion", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { accion, comentario, rh_id } = req.body;
+    if (!accion || !["aprobar","rechazar","en_proceso"].includes(accion)) {
+      return res.status(400).json({ ok: false, mensaje: "Accion inválida" });
+    }
+
+    // obtener solicitud
+    const [rows] = await db.promise().query("SELECT * FROM solicitudes_vacaciones WHERE id = ?", [id]);
+    if (!rows.length) return res.status(404).json({ ok: false, mensaje: "Solicitud no encontrada" });
+    const solicitud = rows[0];
+
+    let nuevoEstatus;
+    if (accion === "aprobar") nuevoEstatus = "Aprobado";
+    if (accion === "rechazar") nuevoEstatus = "Rechazado";
+    if (accion === "en_proceso") nuevoEstatus = "En proceso";
+
+    await db.promise().query(
+      "UPDATE solicitudes_vacaciones SET estatus = ?, comentario_rh = ?, fecha_respuesta = NOW() WHERE id = ?",
+      [nuevoEstatus, comentario || null, id]
+    );
+
+    // Opcional: aquí podrías enviar notificación o correo
+
+    res.json({ ok: true, mensaje: `Solicitud ${nuevoEstatus.toLowerCase()}` });
+  } catch (err) {
+    console.error("ERROR POST /api/solicitudes/vacaciones/:id/accion:", err);
+    res.status(500).json({ ok: false, mensaje: "Error en servidor" });
+  }
 });
 
