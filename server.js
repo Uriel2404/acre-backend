@@ -477,19 +477,22 @@ const uploadEmpleado = multer({
 // =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento, fecha_ingreso} = req.body;
+        const { nombre, puesto, correo, telefono, departamento, fecha_ingreso } = req.body;
         if (!nombre || !puesto) {
             return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
         }
-        // Si sube foto, úsala. Si no, null.
+
         const fotoNueva = req.file
             ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
             : null;
-        await db.query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?)",
+
+        await db.promise().query(
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [nombre, puesto, correo, telefono, departamento, fecha_ingreso, fotoNueva]
         );
+
         res.json({ success: true });
+
     } catch (err) {
         console.error("Error al crear empleado:", err);
         res.status(500).json({ error: "Error al crear empleado" });
@@ -824,6 +827,7 @@ app.post("/vacaciones/cambiar-estado", (req, res) => {
     res.json({ message: "Estado actualizado" });
   });
 });
+
 
 
 
