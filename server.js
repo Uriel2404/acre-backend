@@ -676,7 +676,6 @@ app.delete("/organigramas/:id", async (req, res) => {
     }
 });
 
-
 // ===============================
 //      C A L E N D A R I O
 // ===============================
@@ -700,5 +699,51 @@ app.get("/calendar/events", (req, res) => {
 
     res.json(rows);
   });
+});
+
+// ===============================
+//      V A C A C I O N E S
+// ===============================
+
+app.post("/solicitud/vacaciones", (req, res) => {
+  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
+
+  // Validación rápida
+  if (!empleado_id || !fecha_inicio || !fecha_fin) {
+    return res.json({
+      ok: false,
+      mensaje: "Faltan datos obligatorios"
+    });
+  }
+
+  // Calcular días solicitados
+  const diasSolicitados =
+    Math.floor((new Date(fecha_fin) - new Date(fecha_inicio)) / (1000 * 60 * 60 * 24)) + 1;
+
+  const sql = `
+    INSERT INTO solicitudes_vacaciones 
+    (empleado_id, fecha_inicio, fecha_fin, motivo, dias) 
+    VALUES (?, ?, ?, ?, ?)
+  `;
+
+  connection.query(
+    sql,
+    [empleado_id, fecha_inicio, fecha_fin, motivo, diasSolicitados],
+    (err, result) => {
+      if (err) {
+        console.log("ERROR al guardar solicitud:", err);
+        return res.json({
+          ok: false,
+          mensaje: "Error en el servidor"
+        });
+      }
+
+      res.json({
+        ok: true,
+        mensaje: "Solicitud registrada correctamente",
+        solicitud_id: result.insertId
+      });
+    }
+  );
 });
 
