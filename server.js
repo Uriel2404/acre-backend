@@ -704,25 +704,6 @@ app.get("/calendar/events", (req, res) => {
 // ===============================
 //      V A C A C I O N E S
 // ===============================
-// -----------------------------
-// SOLICITUD DE VACACIONES
-// -----------------------------
-const express = require("express");
-const app = express();
-const mysql = require("mysql2");
-const cors = require("cors");
-
-app.use(cors());
-app.use(express.json());
-
-// 🔗 Conexión MySQL
-const db = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "intranet_acre"
-});
-
 
 // -----------------------------------------------------
 // 1️⃣ CREAR UNA SOLICITUD DE VACACIONES
@@ -829,4 +810,5 @@ app.put("/api/admin/solicitudes/vacaciones/:id", (req, res) => {
 app.listen(3001, () => {
   console.log("Servidor corriendo en http://localhost:3001");
 });
+
 
