@@ -477,7 +477,7 @@ const uploadEmpleado = multer({
 // =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento } = req.body;
+        const { nombre, puesto, correo, telefono, departamento, fecha_ingreso} = req.body;
         if (!nombre || !puesto) {
             return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
         }
@@ -486,7 +486,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
             ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
             : null;
         await db.query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, foto) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?)",
             [nombre, puesto, correo, telefono, departamento, fotoNueva]
         );
         res.json({ success: true });
@@ -515,7 +515,7 @@ app.get("/empleados", async (req, res) => {
 app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, puesto, correo, telefono, departamento, foto_actual } = req.body;
+    const { nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto_actual } = req.body;
     let fotoUrl = foto_actual || null;
     // Si sube nueva foto → subir al FTP
     if (req.file) {
@@ -537,9 +537,9 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     // Actualizar DB
     await db.promise().query(
       `UPDATE empleados 
-       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, foto=?
+       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, fecha_ingreso=?, foto=?
        WHERE id=?`,
-      [nombre, puesto, correo, telefono, departamento, fotoUrl, id]
+      [nombre, puesto, correo, telefono, departamento, fecha_ingreso, fotoUrl, id]
     );
     res.json({ success: true, message: "Empleado actualizado correctamente", foto: fotoUrl });
   } catch (err) {
