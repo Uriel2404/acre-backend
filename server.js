@@ -487,7 +487,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
             : null;
         await db.query(
             "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?)",
-            [nombre, puesto, correo, telefono, departamento, fotoNueva]
+            [nombre, puesto, correo, telefono, departamento, fecha_ingreso, fotoNueva]
         );
         res.json({ success: true });
     } catch (err) {
@@ -824,6 +824,7 @@ app.post("/vacaciones/cambiar-estado", (req, res) => {
     res.json({ message: "Estado actualizado" });
   });
 });
+
 
 
 
