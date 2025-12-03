@@ -708,7 +708,7 @@ app.get("/calendar/events", (req, res) => {
 // -----------------------------------------------------
 // 1️⃣ CREAR UNA SOLICITUD DE VACACIONES
 // -----------------------------------------------------
-app.post("/api/solicitudes/vacaciones", (req, res) => {
+app.post("/solicitudes/vacaciones", (req, res) => {
   const { user_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
   if (!user_id || !fecha_inicio || !fecha_fin) {
@@ -746,7 +746,7 @@ app.post("/api/solicitudes/vacaciones", (req, res) => {
 // -----------------------------------------------------
 // 2️⃣ OBTENER MIS SOLICITUDES
 // -----------------------------------------------------
-app.get("/api/solicitudes/vacaciones/:user_id", (req, res) => {
+app.get("/solicitudes/vacaciones/:user_id", (req, res) => {
   const { user_id } = req.params;
 
   const sql = `
@@ -765,7 +765,7 @@ app.get("/api/solicitudes/vacaciones/:user_id", (req, res) => {
 // -----------------------------------------------------
 // 3️⃣ PANEL ADMIN → LISTAR TODAS LAS SOLICITUDES
 // -----------------------------------------------------
-app.get("/api/admin/solicitudes/vacaciones", (req, res) => {
+app.get("/admin/solicitudes/vacaciones", (req, res) => {
   const sql = `
     SELECT s.*, e.nombre AS empleado
     FROM solicitudes_vacaciones s
@@ -783,7 +783,7 @@ app.get("/api/admin/solicitudes/vacaciones", (req, res) => {
 // -----------------------------------------------------
 // 4️⃣ ADMIN → APROBAR O RECHAZAR
 // -----------------------------------------------------
-app.put("/api/admin/solicitudes/vacaciones/:id", (req, res) => {
+app.put("/admin/solicitudes/vacaciones/:id", (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
@@ -810,5 +810,6 @@ app.put("/api/admin/solicitudes/vacaciones/:id", (req, res) => {
 app.listen(3001, () => {
   console.log("Servidor corriendo en http://localhost:3001");
 });
+
 
 
