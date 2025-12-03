@@ -719,136 +719,112 @@ app.listen(3001, () => {
 
 // Crear solicitud de vacaciones
 app.post("/vacaciones/solicitar", (req, res) => {
-  const { empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo } = req.body;
+  const {
+    empleado_id,
+    nombre,
+    departamento,
+    fecha_inicio,
+    fecha_fin,
+    dias,
+    comentarios
+  } = req.body;
 
-  if (!empleado_id || !fecha_inicio || !fecha_fin) {
+  if (!empleado_id || !fecha_inicio || !fecha_fin || !dias) {
     return res.status(400).json({ message: "Faltan datos obligatorios" });
   }
 
-  // Validar que no existan solicitudes en las mismas fechas
-  const sqlCheck = `
-    SELECT * FROM vacaciones 
-    WHERE empleado_id = ? 
-    AND (
-      (fecha_inicio <= ? AND fecha_fin >= ?) OR
-      (fecha_inicio <= ? AND fecha_fin >= ?) OR
-      (fecha_inicio >= ? AND fecha_fin <= ?)
-    )
+  const sql = `
+    INSERT INTO vacaciones (
+      empleado_id,
+      nombre,
+      departamento,
+      fecha_inicio,
+      fecha_fin,
+      dias,
+      comentarios,
+      estado,
+      fecha_solicitud
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', NOW())
   `;
 
   db.query(
-    sqlCheck,
-    [
-      empleado_id,
-      fecha_inicio, fecha_inicio,
-      fecha_fin, fecha_fin,
-      fecha_inicio, fecha_fin
-    ],
-    (err, rows) => {
-      if (err) return res.status(500).json({ message: "Error validando fechas" });
-
-      if (rows.length > 0) {
-        return res.status(400).json({ message: "Ya existe una solicitud en esas fechas" });
+    sql,
+    [empleado_id, nombre, departamento, fecha_inicio, fecha_fin, dias, comentarios],
+    (err, result) => {
+      if (err) {
+        console.error("MYSQL ERROR:", err);
+        return res.status(500).json({ message: "Error al registrar solicitud" });
       }
 
-      // Insertar solicitud
-      const sqlInsert = `
-        INSERT INTO vacaciones 
-        (empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo, estatus, fecha_solicitud)
-        VALUES (?, ?, ?, ?, ?, 'Pendiente', NOW())
-      `;
-
-      db.query(
-        sqlInsert,
-        [empleado_id, nombre_empleado, fecha_inicio, fecha_fin, motivo],
-        (err2, result) => {
-          if (err2) return res.status(500).json({ message: "Error al crear solicitud" });
-
-          res.json({
-            message: "Solicitud enviada exitosamente",
-            id: result.insertId
-          });
-        }
-      );
+      res.json({
+        message: "Solicitud enviada correctamente",
+        id: result.insertId
+      });
     }
   );
 });
 
-// Obtener solicitudes de un empleado (para su panel)
-app.get("/vacaciones/empleado/:id", (req, res) => {
-  const empleado_id = req.params.id;
+// Obtener solicitudes por empleado
+app.get("/vacaciones/mis-solicitudes/:empleado_id", (req, res) => {
+  const { empleado_id } = req.params;
 
   const sql = `
-    SELECT * FROM vacaciones 
+    SELECT * FROM vacaciones
     WHERE empleado_id = ?
     ORDER BY fecha_solicitud DESC
   `;
 
   db.query(sql, [empleado_id], (err, rows) => {
-    if (err) return res.status(500).json({ message: "Error al obtener solicitudes" });
+    if (err) {
+      console.error("MYSQL ERROR:", err);
+      return res.status(500).json({ message: "Error al obtener solicitudes" });
+    }
+
     res.json(rows);
   });
 });
 
-// Obtener todas las solicitudes (para RH/Administrador)
+// Obtener TODAS las solicitudes (solo RH y Admin)
 app.get("/vacaciones/todas", (req, res) => {
   const sql = `
-    SELECT * FROM vacaciones 
+    SELECT * FROM vacaciones
     ORDER BY fecha_solicitud DESC
   `;
+
   db.query(sql, (err, rows) => {
-    if (err) return res.status(500).json({ message: "Error al obtener solicitudes" });
+    if (err) {
+      console.error("MYSQL ERROR:", err);
+      return res.status(500).json({ message: "Error al obtener solicitudes" });
+    }
+
     res.json(rows);
   });
 });
 
-// Aprobar solicitud
-app.post("/vacaciones/aprobar", validarRol(["Administrador", "RH"]), (req, res) => {
-  const { id } = req.body;
+// Cambiar estado (Aprobar / Rechazar)
+app.post("/vacaciones/cambiar-estado", (req, res) => {
+  const { id, estado } = req.body;
+
+  if (!id || !estado) {
+    return res.status(400).json({ message: "Faltan datos" });
+  }
 
   const sql = `
-    UPDATE vacaciones 
-    SET estatus = 'Aprobada', fecha_respuesta = NOW() 
+    UPDATE vacaciones
+    SET estado = ?, fecha_respuesta = NOW()
     WHERE id = ?
   `;
 
-  db.query(sql, [id], (err) => {
-    if (err) return res.status(500).json({ message: "Error al aprobar" });
-    res.json({ message: "Solicitud aprobada" });
+  db.query(sql, [estado, id], (err) => {
+    if (err) {
+      console.error("MYSQL ERROR:", err);
+      return res.status(500).json({ message: "Error al actualizar estado" });
+    }
+
+    res.json({ message: "Estado actualizado" });
   });
 });
 
-// Rechazar solicitud
-app.post("/vacaciones/rechazar", validarRol(["Administrador", "RH"]), (req, res) => {
-  const { id, motivo_rechazo } = req.body;
-
-  const sql = `
-    UPDATE vacaciones 
-    SET estatus = 'Rechazada', motivo_rechazo = ?, fecha_respuesta = NOW() 
-    WHERE id = ?
-  `;
-
-  db.query(sql, [motivo_rechazo, id], (err) => {
-    if (err) return res.status(500).json({ message: "Error al rechazar" });
-    res.json({ message: "Solicitud rechazada" });
-  });
-});
-
-// Cancelar solicitud (empleado)
-app.post("/vacaciones/cancelar", (req, res) => {
-  const { id, empleado_id } = req.body;
-
-  const sql = `
-    UPDATE vacaciones 
-    SET estatus = 'Cancelada' 
-    WHERE id = ? AND empleado_id = ?
-  `;
-
-  db.query(sql, [id, empleado_id], (err) => {
-    if (err) return res.status(500).json({ message: "Error al cancelar solicitud" });
-    res.json({ message: "Solicitud cancelada" });
-  });
-});
 
 
 
