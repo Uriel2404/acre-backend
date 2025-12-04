@@ -61,7 +61,7 @@ app.get("/", (req, res) => {
   res.send("API Funcionando ✅");
 });
 // ======================
-//  LOGIN
+//  LOGIN CON EMPLEADO
 // ======================
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -69,22 +69,43 @@ app.post("/login", async (req, res) => {
   if (!email || !password)
     return res.status(400).json({ message: "Faltan datos" });
 
-  const sql = "SELECT * FROM usuarios WHERE email = ?";
+  const sqlUser = "SELECT * FROM usuarios WHERE email = ?";
+  const sqlEmpleado = "SELECT * FROM empleados WHERE correo = ?";
 
-  db.query(sql, [email], async (err, result) => {
+  db.query(sqlUser, [email], async (err, result) => {
     if (err) {
       console.error("ERROR MYSQL:", err);
       return res.status(500).json({ message: "Error en el servidor" });
     }
+
     if (result.length === 0)
       return res.status(401).json({ message: "Credenciales incorrectas" });
+
     const user = result[0];
+
+    // Validación de password simple (igual que ya haces)
     if (password !== user.password) {
       return res.status(401).json({ message: "Credenciales incorrectas" });
     }
-    res.json({ message: "Login exitoso", user });
+
+    // AHORA BUSCAMOS SU REGISTRO DE EMPLEADO
+    db.query(sqlEmpleado, [email], (err2, empleadoResult) => {
+      if (err2) {
+        console.error("ERROR MYSQL:", err2);
+        return res.status(500).json({ message: "Error al obtener empleado" });
+      }
+
+      const empleado = empleadoResult.length > 0 ? empleadoResult[0] : null;
+
+      return res.json({
+        message: "Login exitoso",
+        user,
+        empleado,
+      });
+    });
   });
 });
+
 
 // ===============================================================
 //                    C A R R U S E L
@@ -827,6 +848,7 @@ app.post("/vacaciones/cambiar-estado", (req, res) => {
     res.json({ message: "Estado actualizado" });
   });
 });
+
 
 
 
