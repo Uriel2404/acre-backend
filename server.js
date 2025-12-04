@@ -850,6 +850,29 @@ app.post("/vacaciones/cambiar-estado", (req, res) => {
 });
 
 
+// ============================================
+// OBTENER USUARIO CUANDO INGRESA A LA INTRANET
+// ============================================
+app.get("/empleadoByEmail/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const [rows] = await db.promise().query(
+      "SELECT * FROM empleados WHERE correo = ?",
+      [email]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Empleado no encontrado" });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("ERROR OBTENER EMPLEADO POR EMAIL:", err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+});
+
 
 
 
