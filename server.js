@@ -889,9 +889,8 @@ app.get("/desarrollos", (req, res) => {
 });
 
 // Agregar desarrollo (solo Admin o RH)
-app.post("/desarrollos/add",
-  validarRol(["Administrador", "RH"]),
-  (req, res) => {
+app.post("/desarrollos/add", (req, res) => {
+
     const { imagen_url } = req.body;
 
     if (!imagen_url)
@@ -954,6 +953,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
     res.status(500).json({ message: "Error al subir imagen" });
   }
 });
+
 
 
 
