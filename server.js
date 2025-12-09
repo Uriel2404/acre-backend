@@ -890,12 +890,9 @@ app.get("/desarrollos", (req, res) => {
 
 // Agregar desarrollo (solo Admin o RH)
 app.post("/desarrollos/add", (req, res) => {
-
     const { imagen_url } = req.body;
-
     if (!imagen_url)
       return res.status(400).json({ message: "URL de imagen requerida" });
-
     const sql = `INSERT INTO desarrollos (imagen_url) VALUES (?)`;
     db.query(sql, [imagen_url], (err) => {
       if (err) return res.status(500).json({ message: "Error al agregar desarrollo" });
@@ -906,12 +903,9 @@ app.post("/desarrollos/add", (req, res) => {
 
 // Eliminar desarrollo
 app.post("/desarrollos/delete",
-  validarRol(["Administrador", "RH"]),
   (req, res) => {
     const { id } = req.body;
-
     if (!id) return res.status(400).json({ message: "ID requerido" });
-
     const sql = "DELETE FROM desarrollos WHERE id = ?";
     db.query(sql, [id], (err) => {
       if (err) return res.status(500).json({ message: "Error al eliminar desarrollo" });
@@ -953,6 +947,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
     res.status(500).json({ message: "Error al subir imagen" });
   }
 });
+
 
 
 
