@@ -875,6 +875,88 @@ app.get("/empleadoByEmail/:email", async (req, res) => {
 
 
 
+// ===============================================================
+//                 D E S A R R O L L O S   A C T I V O S
+// ===============================================================
+
+// Obtener desarrollos
+app.get("/desarrollos", (req, res) => {
+  const sql = "SELECT * FROM desarrollos ORDER BY id DESC";
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ message: "Error al obtener desarrollos" });
+    res.json(result);
+  });
+});
+
+// Agregar desarrollo (solo Admin o RH)
+app.post("/desarrollos/add",
+  validarRol(["Administrador", "RH"]),
+  (req, res) => {
+    const { imagen_url } = req.body;
+
+    if (!imagen_url)
+      return res.status(400).json({ message: "URL de imagen requerida" });
+
+    const sql = `INSERT INTO desarrollos (imagen_url) VALUES (?)`;
+    db.query(sql, [imagen_url], (err) => {
+      if (err) return res.status(500).json({ message: "Error al agregar desarrollo" });
+      res.json({ message: "Imagen agregada exitosamente" });
+    });
+  }
+);
+
+// Eliminar desarrollo
+app.post("/desarrollos/delete",
+  validarRol(["Administrador", "RH"]),
+  (req, res) => {
+    const { id } = req.body;
+
+    if (!id) return res.status(400).json({ message: "ID requerido" });
+
+    const sql = "DELETE FROM desarrollos WHERE id = ?";
+    db.query(sql, [id], (err) => {
+      if (err) return res.status(500).json({ message: "Error al eliminar desarrollo" });
+      res.json({ message: "Imagen eliminada" });
+    });
+  }
+);
+
+// Subir imagen de desarrollo por FTP
+app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
+  try {
+    if (!req.file)
+      return res.status(400).json({ message: "No se envió imagen" });
+
+    const localPath = req.file.path;
+    const fileName = Date.now() + "_" + req.file.originalname;
+
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false
+    });
+
+    await client.ensureDir("/public_html/Intranet/desarrollos");
+    await client.uploadFrom(localPath, `/public_html/Intranet/desarrollos/${fileName}`);
+    client.close();
+
+    const imageUrl = `https://acre.mx/Intranet/desarrollos/${fileName}`;
+
+    // Limpia archivo temporal
+    fs.unlinkSync(localPath);
+
+    res.json({ message: "Imagen subida", url: imageUrl });
+
+  } catch (error) {
+    console.log("UPLOAD ERROR:", error);
+    res.status(500).json({ message: "Error al subir imagen" });
+  }
+});
+
+
+
 
 
 
