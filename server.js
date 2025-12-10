@@ -734,122 +734,6 @@ app.listen(3001, () => {
 });
 
 
-
-
-
-// ===============================================================
-//                S O L I C I T U D E S   D E   V A C A C I O N E S
-// ===============================================================
-
-// Crear solicitud de vacaciones
-app.post("/vacaciones/solicitar", (req, res) => {
-  const {
-    empleado_id,
-    nombre,
-    departamento,
-    fecha_inicio,
-    fecha_fin,
-    dias,
-    comentarios
-  } = req.body;
-
-  if (!empleado_id || !fecha_inicio || !fecha_fin || !dias) {
-    return res.status(400).json({ message: "Faltan datos obligatorios" });
-  }
-
-  const sql = `
-    INSERT INTO vacaciones (
-      empleado_id,
-      nombre,
-      departamento,
-      fecha_inicio,
-      fecha_fin,
-      dias,
-      comentarios,
-      estado,
-      fecha_solicitud
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendiente', NOW())
-  `;
-
-  db.query(
-    sql,
-    [empleado_id, nombre, departamento, fecha_inicio, fecha_fin, dias, comentarios],
-    (err, result) => {
-      if (err) {
-        console.error("MYSQL ERROR:", err);
-        return res.status(500).json({ message: "Error al registrar solicitud" });
-      }
-
-      res.json({
-        message: "Solicitud enviada correctamente",
-        id: result.insertId
-      });
-    }
-  );
-});
-
-// Obtener solicitudes por empleado
-app.get("/vacaciones/mis-solicitudes/:empleado_id", (req, res) => {
-  const { empleado_id } = req.params;
-
-  const sql = `
-    SELECT * FROM vacaciones
-    WHERE empleado_id = ?
-    ORDER BY fecha_solicitud DESC
-  `;
-
-  db.query(sql, [empleado_id], (err, rows) => {
-    if (err) {
-      console.error("MYSQL ERROR:", err);
-      return res.status(500).json({ message: "Error al obtener solicitudes" });
-    }
-
-    res.json(rows);
-  });
-});
-
-// Obtener TODAS las solicitudes (solo RH y Admin)
-app.get("/vacaciones/todas", (req, res) => {
-  const sql = `
-    SELECT * FROM vacaciones
-    ORDER BY fecha_solicitud DESC
-  `;
-
-  db.query(sql, (err, rows) => {
-    if (err) {
-      console.error("MYSQL ERROR:", err);
-      return res.status(500).json({ message: "Error al obtener solicitudes" });
-    }
-
-    res.json(rows);
-  });
-});
-
-// Cambiar estado (Aprobar / Rechazar)
-app.post("/vacaciones/cambiar-estado", (req, res) => {
-  const { id, estado } = req.body;
-
-  if (!id || !estado) {
-    return res.status(400).json({ message: "Faltan datos" });
-  }
-
-  const sql = `
-    UPDATE vacaciones
-    SET estado = ?, fecha_respuesta = NOW()
-    WHERE id = ?
-  `;
-
-  db.query(sql, [estado, id], (err) => {
-    if (err) {
-      console.error("MYSQL ERROR:", err);
-      return res.status(500).json({ message: "Error al actualizar estado" });
-    }
-
-    res.json({ message: "Estado actualizado" });
-  });
-});
-
-
 // ============================================
 // OBTENER USUARIO CUANDO INGRESA A LA INTRANET
 // ============================================
@@ -954,6 +838,43 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
 
 
+// ===============================================================
+//                S O L I C I T U D E S   D E   V A C A C I O N E S
+// ===============================================================
 
+// REGISTRAR SOLICITUD DE VACACIONES
+app.post("/vacaciones", async (req, res) => {
+  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
+  const dias = Math.ceil((new Date(fecha_fin) - new Date(fecha_inicio)) / (1000*60*60*24)) + 1;
 
+  await pool.query(
+    "INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, dias, motivo) VALUES (?, ?, ?, ?, ?)",
+    [empleado_id, fecha_inicio, fecha_fin, dias, motivo]
+  );
+
+  res.json({ message: "Solicitud registrada correctamente" });
+});
+
+// LISTAR SOLICITUDES POR EMPLEADO
+app.get("/vacaciones/:id", async (req, res) => {
+  const { id } = req.params;
+  const [rows] = await pool.query(
+    "SELECT * FROM vacaciones WHERE empleado_id = ? ORDER BY fecha_solicitud DESC",
+    [id]
+  );
+  res.json(rows);
+});
+
+// CAMBIAR ESTADO PARA JEFES/RH
+app.put("/vacaciones/:id", async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  await pool.query(
+    "UPDATE vacaciones SET estado = ? WHERE id = ?",
+    [estado, id]
+  );
+
+  res.json({ message: "Estado actualizado" });
+});
