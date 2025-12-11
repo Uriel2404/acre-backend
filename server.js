@@ -847,21 +847,22 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 // ===============================================================
 
 app.post("/vacaciones", (req, res) => {
-  const { empleado_id, inicio, fin, motivo } = req.body;
+  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
   const sql = `
     INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
-    VALUES (?, ?, ?, ?, 'pendiente')
+    VALUES (?, ?, ?, ?, 'Pendiente')
   `;
 
-  connection.query(sql, [empleado_id, inicio, fin, motivo], (err, result) => {
+  connection.query(sql, [empleado_id, fecha_inicio, fecha_fin, motivo], (err, result) => {
     if (err) {
       console.error("Error al insertar solicitud:", err);
       return res.status(500).json({ error: "Error al enviar la solicitud" });
     }
-    res.json({ message: "Solicitud enviada", id: result.insertId });
+  res.json({ ok: true, message: "Solicitud enviada", id: result.insertId });
   });
 });
+
 
 
 
