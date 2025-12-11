@@ -6,6 +6,10 @@ import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
+import db from "../db.js";
+
+export default router;
+
 
 dotenv.config();
 
@@ -871,5 +875,6 @@ router.post("/vacaciones", (req, res) => {
 });
 
 module.exports = router;
+
 
 
