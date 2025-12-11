@@ -841,6 +841,9 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
 
+//=================
+// PEDIR VACACIONES
+//=================
 app.post("/vacaciones", (req, res) => {
   const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
@@ -858,3 +861,40 @@ app.post("/vacaciones", (req, res) => {
     res.json({ ok: true, message: "Solicitud enviada", id: result.insertId });
   });
 });
+
+//===============================
+// VER SOLICITUDES DE VACACIONES
+//===============================
+app.get("/vacaciones", (req, res) => {
+  const sql = `
+    SELECT v.*, e.nombre AS nombre_empleado
+    FROM vacaciones v
+    INNER JOIN empleados e ON v.empleado_id = e.id
+    ORDER BY v.id DESC
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) return res.status(500).json({ error: "Error al obtener solicitudes" });
+    res.json(result);
+  });
+});
+
+//===============================
+// APROBAR O RECHAZAR
+//===============================
+app.put("/vacaciones/:id", (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  const sql = "UPDATE vacaciones SET estado = ? WHERE id = ?";
+
+  db.query(sql, [estado, id], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar:", err);
+      return res.status(500).json({ error: "Error al actualizar estado" });
+    }
+
+    res.json({ ok: true, message: "Estado actualizado" });
+  });
+});
+
