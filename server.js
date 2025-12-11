@@ -885,16 +885,17 @@ app.get("/vacaciones", (req, res) => {
 app.put("/vacaciones/:id", (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
-
+  if (!estado) {
+    return res.status(400).json({ error: "Estado requerido" });
+  }
   const sql = "UPDATE vacaciones SET estado = ? WHERE id = ?";
-
-  db.query(sql, [estado, id], (err, result) => {
+  connection.query(sql, [estado, id], (err, result) => {
     if (err) {
-      console.error("Error al actualizar:", err);
-      return res.status(500).json({ error: "Error al actualizar estado" });
+      console.error("Error al actualizar solicitud:", err);
+      return res.status(500).json({ error: "Error al actualizar" });
     }
-
     res.json({ ok: true, message: "Estado actualizado" });
   });
 });
+
 
