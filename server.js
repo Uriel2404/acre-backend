@@ -6,9 +6,9 @@ import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
-import db from "../db.js";
 
-export default router;
+
+
 
 
 dotenv.config();
@@ -845,36 +845,30 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 // ===============================================================
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
-const router = express.Router();
 
-// =====================
-// S O L I C I T U D E S
-// =====================
-// Registrar solicitud de vacaciones
-router.post("/vacaciones", (req, res) => {
-  const { email, inicio, fin, motivo } = req.body;
+app.post("/vacaciones", async (req, res) => {
+  try {
+    const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
-  if (!email || !inicio || !fin) {
-    return res.status(400).json({ error: "Faltan datos obligatorios" });
+    const sql = `
+      INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
+      VALUES (?, ?, ?, ?, 'Pendiente')
+    `;
+
+    const [result] = await db.execute(sql, [
+      empleado_id,
+      fecha_inicio,
+      fecha_fin,
+      motivo,
+    ]);
+
+    res.json({ ok: true, id: result.insertId });
+
+  } catch (error) {
+    console.error("Error al registrar vacaciones:", error);
+    res.status(500).json({ error: "Error al registrar vacaciones" });
   }
-
-  const sql = `
-    INSERT INTO solicitudes_vacaciones 
-    (empleado_email, fecha_inicio, fecha_fin, motivo)
-    VALUES (?, ?, ?, ?)
-  `;
-
-  db.query(sql, [email, inicio, fin, motivo], (err, result) => {
-    if (err) {
-      console.error("Error guardando solicitud", err);
-      return res.status(500).json({ error: "Error al guardar solicitud" });
-    }
-
-    res.json({ message: "Solicitud enviada correctamente" });
-  });
 });
-
-module.exports = router;
 
 
 
