@@ -889,7 +889,7 @@ app.put("/vacaciones/:id", (req, res) => {
     return res.status(400).json({ error: "Estado requerido" });
   }
   const sql = "UPDATE vacaciones SET estado = ? WHERE id = ?";
-  connection.query(sql, [estado, id], (err, result) => {
+  db.query(sql, [estado, id], (err, result) => {
     if (err) {
       console.error("Error al actualizar solicitud:", err);
       return res.status(500).json({ error: "Error al actualizar" });
@@ -897,5 +897,6 @@ app.put("/vacaciones/:id", (req, res) => {
     res.json({ ok: true, message: "Estado actualizado" });
   });
 });
+
 
 
