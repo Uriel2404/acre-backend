@@ -878,3 +878,33 @@ app.put("/vacaciones/:id", async (req, res) => {
 
   res.json({ message: "Estado actualizado" });
 });
+
+
+// =====================
+// S O L I C I T U D E S
+// =====================
+// Registrar solicitud de vacaciones
+router.post("/vacaciones", (req, res) => {
+  const { email, inicio, fin, motivo } = req.body;
+
+  if (!email || !inicio || !fin) {
+    return res.status(400).json({ error: "Faltan datos obligatorios" });
+  }
+
+  const sql = `
+    INSERT INTO solicitudes_vacaciones 
+    (empleado_email, fecha_inicio, fecha_fin, motivo)
+    VALUES (?, ?, ?, ?)
+  `;
+
+  db.query(sql, [email, inicio, fin, motivo], (err, result) => {
+    if (err) {
+      console.error("Error guardando solicitud", err);
+      return res.status(500).json({ error: "Error al guardar solicitud" });
+    }
+
+    res.json({ message: "Solicitud enviada correctamente" });
+  });
+});
+
+module.exports = router;
