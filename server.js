@@ -837,11 +837,6 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 });
 
 
-
-
-
-
-
 // ===============================================================
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
@@ -854,17 +849,12 @@ app.post("/vacaciones", (req, res) => {
     VALUES (?, ?, ?, ?, 'Pendiente')
   `;
 
-  connection.query(sql, [empleado_id, fecha_inicio, fecha_fin, motivo], (err, result) => {
+  db.query(sql, [empleado_id, fecha_inicio, fecha_fin, motivo], (err, result) => {
     if (err) {
       console.error("Error al insertar solicitud:", err);
       return res.status(500).json({ error: "Error al enviar la solicitud" });
     }
-  res.json({ ok: true, message: "Solicitud enviada", id: result.insertId });
+
+    res.json({ ok: true, message: "Solicitud enviada", id: result.insertId });
   });
 });
-
-
-
-
-
-
