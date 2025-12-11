@@ -846,29 +846,24 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
 
-app.post("/vacaciones", async (req, res) => {
-  try {
-    const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
+app.post("/vacaciones", (req, res) => {
+  const { empleado_id, inicio, fin, motivo } = req.body;
 
-    const sql = `
-      INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
-      VALUES (?, ?, ?, ?, 'Pendiente')
-    `;
+  const sql = `
+    INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
+    VALUES (?, ?, ?, ?, 'pendiente')
+  `;
 
-    const [result] = await db.execute(sql, [
-      empleado_id,
-      fecha_inicio,
-      fecha_fin,
-      motivo,
-    ]);
-
-    res.json({ ok: true, id: result.insertId });
-
-  } catch (error) {
-    console.error("Error al registrar vacaciones:", error);
-    res.status(500).json({ error: "Error al registrar vacaciones" });
-  }
+  connection.query(sql, [empleado_id, inicio, fin, motivo], (err, result) => {
+    if (err) {
+      console.error("Error al insertar solicitud:", err);
+      return res.status(500).json({ error: "Error al enviar la solicitud" });
+    }
+    res.json({ message: "Solicitud enviada", id: result.insertId });
+  });
 });
+
+
 
 
 
