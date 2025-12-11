@@ -842,44 +842,6 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
 
-// REGISTRAR SOLICITUD DE VACACIONES
-app.post("/vacaciones", async (req, res) => {
-  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
-
-  const dias = Math.ceil((new Date(fecha_fin) - new Date(fecha_inicio)) / (1000*60*60*24)) + 1;
-
-  await pool.query(
-    "INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, dias, motivo) VALUES (?, ?, ?, ?, ?)",
-    [empleado_id, fecha_inicio, fecha_fin, dias, motivo]
-  );
-
-  res.json({ message: "Solicitud registrada correctamente" });
-});
-
-// LISTAR SOLICITUDES POR EMPLEADO
-app.get("/vacaciones/:id", async (req, res) => {
-  const { id } = req.params;
-  const [rows] = await pool.query(
-    "SELECT * FROM vacaciones WHERE empleado_id = ? ORDER BY fecha_solicitud DESC",
-    [id]
-  );
-  res.json(rows);
-});
-
-// CAMBIAR ESTADO PARA JEFES/RH
-app.put("/vacaciones/:id", async (req, res) => {
-  const { id } = req.params;
-  const { estado } = req.body;
-
-  await pool.query(
-    "UPDATE vacaciones SET estado = ? WHERE id = ?",
-    [estado, id]
-  );
-
-  res.json({ message: "Estado actualizado" });
-});
-
-
 // =====================
 // S O L I C I T U D E S
 // =====================
@@ -908,3 +870,4 @@ router.post("/vacaciones", (req, res) => {
 });
 
 module.exports = router;
+
