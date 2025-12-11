@@ -841,6 +841,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 // ===============================================================
 //                S O L I C I T U D E S   D E   V A C A C I O N E S
 // ===============================================================
+const router = express.Router();
 
 // =====================
 // S O L I C I T U D E S
@@ -870,4 +871,5 @@ router.post("/vacaciones", (req, res) => {
 });
 
 module.exports = router;
+
 
