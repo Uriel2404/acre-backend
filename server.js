@@ -28,7 +28,7 @@ app.use(cors({
     "https://www.acre.mx",
     "http://localhost:5173"
   ],
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PUT", "OPTIONS"],
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -901,6 +901,7 @@ app.put("/vacaciones/:id", (req, res) => {
     res.json({ ok: true, message: "Estado actualizado" });
   });
 });
+
 
 
 
