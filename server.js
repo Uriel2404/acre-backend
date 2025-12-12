@@ -844,23 +844,62 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 //=================
 // PEDIR VACACIONES
 //=================
-app.post("/vacaciones", (req, res) => {
+app.post("/vacaciones", async (req, res) => {
   const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
-  const sql = `
-    INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
-    VALUES (?, ?, ?, ?, 'Pendiente')
-  `;
+  try {
+    // Obtener días disponibles del empleado
+    const [empRows] = await db.promise().query(
+      "SELECT dias_vacaciones FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
 
-  db.query(sql, [empleado_id, fecha_inicio, fecha_fin, motivo], (err, result) => {
-    if (err) {
-      console.error("Error al insertar solicitud:", err);
-      return res.status(500).json({ error: "Error al enviar la solicitud" });
+    if (!empRows.length) {
+      return res.status(404).json({ error: "Empleado no encontrado" });
     }
 
-    res.json({ ok: true, message: "Solicitud enviada", id: result.insertId });
-  });
+    const disponibles = empRows[0].dias_vacaciones;
+
+    // Calcular días solicitados
+    const inicio = new Date(fecha_inicio);
+    const fin = new Date(fecha_fin);
+    const msPorDia = 1000 * 60 * 60 * 24;
+    const diasSolicitados = Math.ceil((fin - inicio) / msPorDia) + 1;
+
+    // Validación: No permitir pedir más días de los disponibles
+    if (diasSolicitados > disponibles) {
+      return res.status(400).json({
+        error: true,
+        message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${disponibles} disponibles`
+      });
+    }
+
+    // Insertar solicitud si pasa validación
+    const sql = `
+      INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
+      VALUES (?, ?, ?, ?, 'Pendiente')
+    `;
+
+    const [result] = await db.promise().query(sql, [
+      empleado_id,
+      fecha_inicio,
+      fecha_fin,
+      motivo
+    ]);
+
+    return res.json({
+      ok: true,
+      message: "Solicitud enviada correctamente",
+      id: result.insertId,
+      diasSolicitados
+    });
+
+  } catch (err) {
+    console.error("Error al insertar solicitud:", err);
+    return res.status(500).json({ error: "Error al enviar la solicitud" });
+  }
 });
+
 
 //===============================
 // VER SOLICITUDES DE VACACIONES
@@ -990,6 +1029,7 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener historial" });
   }
 });
+
 
 
 
