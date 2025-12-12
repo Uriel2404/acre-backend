@@ -865,18 +865,22 @@ app.post("/vacaciones", (req, res) => {
 //===============================
 // VER SOLICITUDES DE VACACIONES
 //===============================
-app.get("/vacaciones", (req, res) => {
-  const sql = `
-    SELECT v.*, e.nombre AS nombre_empleado
-    FROM vacaciones v
-    INNER JOIN empleados e ON v.empleado_id = e.id
-    ORDER BY v.id DESC
-  `;
-
-  db.query(sql, (err, result) => {
-    if (err) return res.status(500).json({ error: "Error al obtener solicitudes" });
-    res.json(result);
-  });
+// GET /vacaciones -> lista solicitudes con datos del empleado
+app.get("/vacaciones", async (req, res) => {
+  try {
+    const sql = `
+      SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.motivo, v.estado,
+             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_vacaciones
+      FROM vacaciones v
+      LEFT JOIN empleados e ON v.empleado_id = e.id
+      ORDER BY v.id DESC
+    `;
+    const [rows] = await db.promise().query(sql);
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR GET /vacaciones:", err);
+    res.status(500).json({ message: "Error al obtener solicitudes" });
+  }
 });
 
 //===============================
@@ -954,24 +958,6 @@ app.put("/vacaciones/:id", async (req, res) => {
   }
 });
 
-
-// GET /vacaciones -> lista solicitudes con datos del empleado
-app.get("/vacaciones", async (req, res) => {
-  try {
-    const sql = `
-      SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.motivo, v.estado,
-             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_vacaciones
-      FROM vacaciones v
-      LEFT JOIN empleados e ON v.empleado_id = e.id
-      ORDER BY v.id DESC
-    `;
-    const [rows] = await db.promise().query(sql);
-    res.json(rows);
-  } catch (err) {
-    console.error("ERROR GET /vacaciones:", err);
-    res.status(500).json({ message: "Error al obtener solicitudes" });
-  }
-});
 
 
 
