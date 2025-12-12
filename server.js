@@ -884,7 +884,7 @@ app.get("/vacaciones", async (req, res) => {
 });
 
 //===============================
-// APROBAR O RECHAZAR
+// APROBAR O RECHAZAR SOLICITUDES
 //===============================
 
 app.put("/vacaciones/:id", async (req, res) => {
@@ -959,7 +959,37 @@ app.put("/vacaciones/:id", async (req, res) => {
 });
 
 
+// =============================
+// VER SOLICITUDES POR EMPLEADO
+// =============================
+app.get("/vacaciones/empleado/:id", async (req, res) => {
+  const { id } = req.params;
 
+  try {
+    const sql = `
+      SELECT 
+        v.id,
+        v.fecha_inicio,
+        v.fecha_fin,
+        v.motivo,
+        v.estado,
+        v.fecha_solicitud,
+        e.nombre,
+        e.dias_vacaciones
+      FROM vacaciones v
+      INNER JOIN empleados e ON v.empleado_id = e.id
+      WHERE v.empleado_id = ?
+      ORDER BY v.id DESC
+    `;
+
+    const [rows] = await db.promise().query(sql, [id]);
+    res.json(rows);
+
+  } catch (err) {
+    console.error("ERROR GET /vacaciones/empleado/:id:", err);
+    res.status(500).json({ error: "Error al obtener historial" });
+  }
+});
 
 
 
