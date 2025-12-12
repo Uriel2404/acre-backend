@@ -882,24 +882,95 @@ app.get("/vacaciones", (req, res) => {
 //===============================
 // APROBAR O RECHAZAR
 //===============================
-app.put("/vacaciones/:id", (req, res) => {
+
+app.put("/vacaciones/:id", async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
-  if (!estado) {
-    return res.status(400).json({ error: "Estado requerido" });
-  }
+  if (!estado) return res.status(400).json({ error: "Estado requerido" });
 
-  const sql = "UPDATE vacaciones SET estado = ? WHERE id = ?";
+  const conn = await db.promise().getConnection();
+  try {
+    await conn.beginTransaction();
 
-  db.query(sql, [estado, id], (err, result) => {
-    if (err) {
-      console.error("Error al actualizar solicitud:", err);
-      return res.status(500).json({ error: "Error al actualizar" });
+    // 1) Obtener solicitud + empleado
+    const [rows] = await conn.query(
+      `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
+              e.nombre, e.dias_vacaciones
+       FROM vacaciones v
+       JOIN empleados e ON v.empleado_id = e.id
+       WHERE v.id = ? FOR UPDATE`,
+      [id]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      conn.release();
+      return res.status(404).json({ error: "Solicitud no encontrada" });
     }
 
-    res.json({ ok: true, message: "Estado actualizado" });
-  });
+    const solicitud = rows[0];
+
+    // calcular dias solicitados (incluyendo el día final)
+    const inicio = new Date(solicitud.fecha_inicio);
+    const fin = new Date(solicitud.fecha_fin);
+    const msPorDia = 1000 * 60 * 60 * 24;
+    const diasSolicitados = Math.ceil((fin - inicio) / msPorDia) + 1;
+
+    // Si apruebas, validar días disponibles
+    if (estado === "Aprobada") {
+      if (solicitud.dias_vacaciones == null) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ error: "Empleado no tiene dias_vacaciones configurados" });
+      }
+      if (diasSolicitados > solicitud.dias_vacaciones) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ error: "El empleado no tiene suficientes días disponibles" });
+      }
+    }
+
+    // 2) Actualizar estado de la solicitud
+    await conn.query("UPDATE vacaciones SET estado = ? WHERE id = ?", [estado, id]);
+
+    // 3) Si fue aprobada -> restar dias en empleados
+    if (estado === "Aprobada") {
+      await conn.query(
+        "UPDATE empleados SET dias_vacaciones = dias_vacaciones - ? WHERE id = ?",
+        [diasSolicitados, solicitud.empleado_id]
+      );
+    }
+
+    await conn.commit();
+    conn.release();
+
+    return res.json({ ok: true, message: "Estado actualizado", diasSolicitados });
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    conn.release();
+    console.error("ERROR PUT /vacaciones/:id", err);
+    return res.status(500).json({ error: "Error al actualizar solicitud" });
+  }
+});
+
+
+// GET /vacaciones -> lista solicitudes con datos del empleado
+app.get("/vacaciones", async (req, res) => {
+  try {
+    const sql = `
+      SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.motivo, v.estado,
+             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_vacaciones
+      FROM vacaciones v
+      LEFT JOIN empleados e ON v.empleado_id = e.id
+      ORDER BY v.id DESC
+    `;
+    const [rows] = await db.promise().query(sql);
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR GET /vacaciones:", err);
+    res.status(500).json({ message: "Error al obtener solicitudes" });
+  }
 });
 
 
