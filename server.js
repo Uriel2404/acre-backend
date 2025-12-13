@@ -10,16 +10,22 @@ import nodemailer from "nodemailer";
 
 const app = express();
 // transporter
-export const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: false,
+  secure: false,        // 587 = STARTTLS
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
   requireTLS: true,
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
+
+
+console.log("📧 Inicializando SMTP...");
 
 transporter.verify((error, success) => {
   if (error) {
@@ -28,6 +34,7 @@ transporter.verify((error, success) => {
     console.log("✅ SMTP listo para enviar correos");
   }
 });
+
 
 app.listen(3000, () => {
   console.log("Servidor corriendo");
