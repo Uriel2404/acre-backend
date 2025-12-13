@@ -6,7 +6,7 @@ import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
-
+import transporter from "./utils/mailer.js";
 
 
 

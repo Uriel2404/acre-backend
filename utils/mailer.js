@@ -1,14 +1,16 @@
 import nodemailer from "nodemailer";
 
-export const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,      // mail.acre.mx
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT), // 587
-  secure: false, // ⚠️ CLAVE (NO true)
+  secure: false, // ⚠️ IMPORTANTE
   auth: {
-    user: process.env.SMTP_USER, // intranet@acre.mx
+    user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
   tls: {
-    rejectUnauthorized: false, // 🔑 evita problemas de certificado en cPanel
+    rejectUnauthorized: false,
   },
 });
+
+export default transporter;
