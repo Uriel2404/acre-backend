@@ -8,7 +8,7 @@ import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
 
-
+const app = express();
 // transporter
 export const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -40,7 +40,7 @@ const upload = multer({
   dest: "/tmp",
   limits: { fileSize: 5 * 1024 * 1024 } // 5mb
 });
-const app = express();
+
 // ======================
 //  CORS
 // ======================
