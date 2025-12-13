@@ -1030,8 +1030,24 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
   }
 });
 
+//===============================================================
+//                  T E S T   D E   C O R R E O S
+// ===============================================================
 
+import transporter from "./utils/mailer.js";
 
+app.get("/test-mail", async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: `"INTRANET ACRE" <${process.env.SMTP_USER}>`,
+      to: "tu_correo_personal@gmail.com",
+      subject: "Correo de prueba",
+      text: "Nodemailer funciona correctamente 🎉"
+    });
 
-
-
+    res.send("Correo enviado correctamente");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error enviando correo");
+  }
+});
