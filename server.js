@@ -970,7 +970,7 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 1) Obtener solicitud + empleado
     const [rows] = await conn.query(
       `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
-              e.nombre, e.dias_vacaciones
+       e.nombre, e.email, e.dias_vacaciones
        FROM vacaciones v
        JOIN empleados e ON v.empleado_id = e.id
        WHERE v.id = ? FOR UPDATE`,
@@ -1019,7 +1019,52 @@ app.put("/vacaciones/:id", async (req, res) => {
     await conn.commit();
     conn.release();
 
+    // ======================
+    // ENVIAR CORREO
+    // ======================
+    try {
+      let subject = "";
+      let message = "";
+
+      if (estado === "Aprobada") {
+        subject = "Vacaciones aprobadas";
+        message = `
+          <h3>Hola ${solicitud.nombre}</h3>
+          <p>Tu solicitud de vacaciones fue <b style="color:green;">APROBADA</b>.</p>
+          <p><strong>Días aprobados:</strong> ${diasSolicitados}</p>
+        `;
+      }
+
+      if (estado === "Rechazada") {
+        subject = "Vacaciones rechazadas";
+        message = `
+          <h3>Hola ${solicitud.nombre}</h3>
+          <p>Tu solicitud de vacaciones fue <b style="color:red;">RECHAZADA</b>.</p>
+          <p>Para más información, contacta a RH.</p>
+        `;
+      }
+
+      if (subject) {
+        await fetch("https://acre.mx/api/send-mail.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": process.env.MAIL_API_KEY
+          },
+          body: JSON.stringify({
+            to: solicitud.email,
+            subject,
+            message
+          })
+        });
+      }
+
+    } catch (mailError) {
+      console.error("❌ Error enviando correo:", mailError);
+    }
+
     return res.json({ ok: true, message: "Estado actualizado", diasSolicitados });
+
   } catch (err) {
     await conn.rollback().catch(() => {});
     conn.release();
