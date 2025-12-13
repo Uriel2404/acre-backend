@@ -8,45 +8,9 @@ import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
 
-const app = express();
-// transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false,        // 587 = STARTTLS
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  requireTLS: true,
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
-
-console.log("📧 Inicializando SMTP...");
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Error SMTP:", error);
-  } else {
-    console.log("✅ SMTP listo para enviar correos");
-  }
-});
-
-
-app.listen(3000, () => {
-  console.log("Servidor corriendo");
-});
-
 dotenv.config();
 
-// Multer (Render solo permite /tmp)
-const upload = multer({
-  dest: "/tmp",
-  limits: { fileSize: 5 * 1024 * 1024 } // 5mb
-});
+const app = express();
 
 // ======================
 //  CORS
@@ -61,6 +25,44 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ============================
+// CONFIG SMTP (CPANEL)
+// ============================
+console.log("📧 Inicializando SMTP...");
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,   // mail.acre.mx
+  port: Number(process.env.SMTP_PORT), // 587
+  secure: false, // STARTTLS
+  auth: {
+    user: process.env.SMTP_USER, // intranet@acre.mx
+    pass: process.env.SMTP_PASS,
+  },
+  requireTLS: true,
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Error SMTP:", error);
+  } else {
+    console.log("✅ SMTP listo para enviar correos");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("Servidor corriendo");
+});
+
+// Multer (Render solo permite /tmp)
+const upload = multer({
+  dest: "/tmp",
+  limits: { fileSize: 5 * 1024 * 1024 } // 5mb
+});
+
 // ======================
 //  MySQL Connection Pool
 // ======================
