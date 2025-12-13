@@ -1052,7 +1052,7 @@ app.put("/vacaciones/:id", async (req, res) => {
             "X-API-KEY": process.env.MAIL_API_KEY
           },
           body: JSON.stringify({
-            to: solicitud.email,
+            to: solicitud.correo,
             subject,
             message
           })
