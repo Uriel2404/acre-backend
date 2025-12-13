@@ -1034,20 +1034,18 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
 //                  T E S T   D E   C O R R E O S
 // ===============================================================
 
-import transporter from "./utils/mailer.js";
-
 app.get("/test-mail", async (req, res) => {
   try {
     await transporter.sendMail({
-      from: `"INTRANET ACRE" <${process.env.SMTP_USER}>`,
-      to: "tu_correo_personal@gmail.com",
-      subject: "Correo de prueba",
-      text: "Nodemailer funciona correctamente 🎉"
+      from: `"Intranet ACRE" <intranet@acre.mx>`,
+      to: "TU_CORREO_PERSONAL@gmail.com",
+      subject: "Prueba SMTP cPanel",
+      text: "Si recibes este correo, SMTP con cPanel funciona correctamente 🚀",
     });
 
-    res.send("Correo enviado correctamente");
+    res.json({ ok: true, message: "Correo enviado correctamente" });
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error enviando correo");
+    console.error("ERROR SMTP:", err);
+    res.status(500).json({ error: err.message });
   }
 });
