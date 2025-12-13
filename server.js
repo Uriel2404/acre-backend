@@ -26,33 +26,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ============================
-// CONFIG SMTP (CPANEL)
-// ============================
-console.log("📧 Inicializando SMTP...");
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,   // mail.acre.mx
-  port: Number(process.env.SMTP_PORT), // 587
-  secure: false, // STARTTLS
-  auth: {
-    user: process.env.SMTP_USER, // intranet@acre.mx
-    pass: process.env.SMTP_PASS,
-  },
-  requireTLS: true,
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Error SMTP:", error);
-  } else {
-    console.log("✅ SMTP listo para enviar correos");
-  }
-});
-
 app.listen(3000, () => {
   console.log("Servidor corriendo");
 });
