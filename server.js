@@ -970,7 +970,7 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 1) Obtener solicitud + empleado
     const [rows] = await conn.query(
       `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
-       e.nombre, e.email, e.dias_vacaciones
+       e.nombre, e.correo, e.dias_vacaciones
        FROM vacaciones v
        JOIN empleados e ON v.empleado_id = e.id
        WHERE v.id = ? FOR UPDATE`,
