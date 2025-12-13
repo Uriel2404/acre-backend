@@ -6,10 +6,32 @@ import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
-import transporter from "./utils/mailer.js";
+import nodemailer from "nodemailer";
 
 
+// transporter
+export const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+  requireTLS: true,
+});
 
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Error SMTP:", error);
+  } else {
+    console.log("✅ SMTP listo para enviar correos");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("Servidor corriendo");
+});
 
 dotenv.config();
 
