@@ -1129,7 +1129,7 @@ app.put("/vacaciones/:id", async (req, res) => {
                 <tr>
                   <td style="background-color:#127726; padding:20px; text-align:center;">
                     <h2 style="margin:0; color:#ffffff; font-size:20px;">
-                      Intranet ACRE Residencial
+                      Intranet Acre Residencial
                     </h2>
                   </td>
                 </tr>
@@ -1202,7 +1202,7 @@ app.put("/vacaciones/:id", async (req, res) => {
                 <!-- FOOTER -->
                 <tr>
                   <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
-                    Este correo fue enviado automáticamente por la Intranet ACRE Residencial.<br>
+                    Este correo fue enviado automáticamente por la Intranet Acre Residencial.<br>
                     No respondas a este mensaje.
                   </td>
                 </tr>
