@@ -849,66 +849,53 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 //=================
 // PEDIR VACACIONES
 //=================
-app.post("/vacaciones", async (req, res) => {
-  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
+  app.post("/vacaciones", async (req, res) => {
+    const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
-  try {
-    // Obtener días disponibles del empleado
-    const [empRows] = await db.promise().query(
-      "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
-      [empleado_id]
-    );
+    try {
+      const [empRows] = await db.promise().query(
+        "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
+        [empleado_id]
+      );
 
-    if (!empRows.length) {
-      return res.status(404).json({ error: "Empleado no encontrado" });
-    }
+      if (!empRows.length) {
+        return res.status(404).json({ error: "Empleado no encontrado" });
+      }
 
-    const empleado = empRows[0];
-    const disponibles = empRows[0].dias_vacaciones;
-    const jefe_id = empRows[0].jefe_id;
+      const empleado = empRows[0];
+      const disponibles = empleado.dias_vacaciones;
+      const jefe_id = empleado.jefe_id;
 
-    if (!jefe_id) {
-      return res.status(400).json({
-        error: true,
-        message: "No tienes un jefe directo asignado. Contacta a RH."
-      });
-    }
+      if (!jefe_id) {
+        return res.status(400).json({
+          error: true,
+          message: "No tienes un jefe directo asignado. Contacta a RH."
+        });
+      }
 
+      const inicio = new Date(fecha_inicio);
+      const fin = new Date(fecha_fin);
+      const diasSolicitados =
+        Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
 
-    // Calcular días solicitados
-    const inicio = new Date(fecha_inicio);
-    const fin = new Date(fecha_fin);
-    const msPorDia = 1000 * 60 * 60 * 24;
-    const diasSolicitados = Math.ceil((fin - inicio) / msPorDia) + 1;
+      if (diasSolicitados > disponibles) {
+        return res.status(400).json({
+          error: true,
+          message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${disponibles}`
+        });
+      }
 
-    // Validación: No permitir pedir más días de los disponibles
-    if (diasSolicitados > disponibles) {
-      return res.status(400).json({
-        error: true,
-        message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${disponibles} disponibles`
-      });
-    }
+      const tokenJefe = crypto.randomBytes(32).toString("hex");
+      const expira = new Date(Date.now() + 1000 * 60 * 60 * 48);
 
-    const tokenJefe = crypto.randomBytes(32).toString("hex");
-    const expira = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 horas
-
-    // Insertar solicitud si pasa validación
-    const sql = `
-      INSERT INTO vacaciones 
-      (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh, token_jefe, token_jefe_expira)
-      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0, ?, ?)
-    `;
-
-    const [result] = await db.promise().query(sql, [
-      empleado_id,
-      jefe_id,
-      fecha_inicio,
-      fecha_fin,
-      motivo,
-      tokenJefe,
-      expira
-    ]); 
-
+      const [result] = await db.promise().query(
+        `
+        INSERT INTO vacaciones
+        (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh, token_jefe, token_jefe_expira)
+        VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0, ?, ?)
+        `,
+        [empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, tokenJefe, expira]
+      );
     // ==============================================
     // ENVIAR CORREO AL JEFE PARA APROBAR O RECHAZAR
     // ==============================================
@@ -989,11 +976,126 @@ app.post("/vacaciones", async (req, res) => {
       console.error("❌ Error enviando correo al jefe:", err);
     }
 
+    // =====================================
+    // ENVIAR CORREO A RH (NUEVA SOLICITUD)
+    // ====================================
 
-    // =============================================
-    // APROBAR VACACIONES POR TOKEN (JEFE)
-    // ============================================
-    app.get("/vacaciones/jefe/aprobar", async (req, res) => {
+    try {
+      const subjectRH = "Nueva solicitud de vacaciones";
+      const messageRH = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Nueva Solicitud de Vacaciones</title>
+      </head>
+
+      <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
+          <tr>
+            <td align="center">
+
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
+
+                <!-- HEADER -->
+                <tr>
+                  <td style="background-color:#127726; padding:20px; text-align:center;">
+                    <h1 style="margin:0; color:#ffffff; font-size:22px;">
+                      📩 Nueva Solicitud de Vacaciones
+                    </h1>
+                  </td>
+                </tr>
+
+                <!-- CONTENT -->
+                <tr>
+                  <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
+
+                    <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                    <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+                    <p><strong>Días solicitados:</strong> ${diasSolicitados}</p>
+
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                    <p><strong>Estado:</strong></p>
+
+                    <span style="
+                      display:inline-block;
+                      padding:6px 14px;
+                      background-color:#fef3c7;
+                      color:#92400e;
+                      border-radius:20px;
+                      font-size:12px;
+                      font-weight:bold;
+                    ">
+                      PENDIENTE
+                    </span>
+
+                    <p style="margin-top:15px;"><strong>Motivo:</strong><br>
+                      ${motivo || "No especificado"}
+                    </p>
+
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                  <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+                    Mensaje automático generado por la Intranet ACRE<br>
+                    No responder este correo
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+        </table>
+
+      </body>
+      </html>
+      `;
+
+      const response = await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: "uriel.ruiz@acre.mx", // CAMBIAR POR CORREO RH CUANDO YA ESTÉ FUNCIONANDO AL 100%
+          subject: subjectRH,
+          message: messageRH
+        })
+      });
+
+      const text = await response.text();
+
+    } catch (err) {
+      console.error("❌ Error enviando correo RH:", err);
+    }
+
+    return res.json({
+      ok: true,
+      message: "Solicitud enviada correctamente",
+      id: result.insertId,
+      diasSolicitados
+    });
+
+  } catch (err) {
+    console.error("Error al insertar solicitud:", err);
+    return res.status(500).json({ error: "Error al enviar la solicitud" });
+  }
+});
+
+
+  // =============================================
+  // APROBAR VACACIONES POR TOKEN (JEFE)
+  // ============================================
+  app.get("/vacaciones/jefe/aprobar", async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
@@ -1111,120 +1213,6 @@ app.post("/vacaciones", async (req, res) => {
   });
 
 
-    // =====================================
-    // ENVIAR CORREO A RH (NUEVA SOLICITUD)
-    // ====================================
-
-    try {
-      const subjectRH = "Nueva solicitud de vacaciones";
-      const messageRH = `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <title>Nueva Solicitud de Vacaciones</title>
-      </head>
-
-      <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
-
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
-          <tr>
-            <td align="center">
-
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
-
-                <!-- HEADER -->
-                <tr>
-                  <td style="background-color:#127726; padding:20px; text-align:center;">
-                    <h1 style="margin:0; color:#ffffff; font-size:22px;">
-                      📩 Nueva Solicitud de Vacaciones
-                    </h1>
-                  </td>
-                </tr>
-
-                <!-- CONTENT -->
-                <tr>
-                  <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
-
-                    <p><strong>Empleado:</strong> ${empleado.nombre}</p>
-
-                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
-
-                    <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
-                    <p><strong>Días solicitados:</strong> ${diasSolicitados}</p>
-
-                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
-
-                    <p><strong>Estado:</strong></p>
-
-                    <span style="
-                      display:inline-block;
-                      padding:6px 14px;
-                      background-color:#fef3c7;
-                      color:#92400e;
-                      border-radius:20px;
-                      font-size:12px;
-                      font-weight:bold;
-                    ">
-                      PENDIENTE
-                    </span>
-
-                    <p style="margin-top:15px;"><strong>Motivo:</strong><br>
-                      ${motivo || "No especificado"}
-                    </p>
-
-                  </td>
-                </tr>
-
-                <!-- FOOTER -->
-                <tr>
-                  <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
-                    Mensaje automático generado por la Intranet ACRE<br>
-                    No responder este correo
-                  </td>
-                </tr>
-
-              </table>
-
-            </td>
-          </tr>
-        </table>
-
-      </body>
-      </html>
-      `;
-
-      const response = await fetch("https://acre.mx/api/send-mail.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-KEY": process.env.MAIL_API_KEY
-        },
-        body: JSON.stringify({
-          to: "uriel.ruiz@acre.mx", // CAMBIAR POR CORREO RH CUANDO YA ESTÉ FUNCIONANDO AL 100%
-          subject: subjectRH,
-          message: messageRH
-        })
-      });
-
-      const text = await response.text();
-
-    } catch (err) {
-      console.error("❌ Error enviando correo RH:", err);
-    }
-
-    return res.json({
-      ok: true,
-      message: "Solicitud enviada correctamente",
-      id: result.insertId,
-      diasSolicitados
-    });
-
-  } catch (err) {
-    console.error("Error al insertar solicitud:", err);
-    return res.status(500).json({ error: "Error al enviar la solicitud" });
-  }
-});
 
 
 //===============================
