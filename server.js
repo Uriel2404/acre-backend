@@ -903,7 +903,7 @@ app.post("/vacaciones", async (req, res) => {
     ]);
 
 
-    // ====================================
+    // =====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
     // ====================================
     const [empDataRows] = await db.promise().query(
