@@ -980,12 +980,136 @@ app.post("/vacaciones", async (req, res) => {
         })
       });
 
+      
+
       const textJefe = await responseJefe.text();
       console.log("📨 Correo enviado al jefe:", jefe.correo);
 
     } catch (err) {
       console.error("❌ Error enviando correo al jefe:", err);
     }
+
+
+    // =============================================
+    // APROBAR VACACIONES POR TOKEN (JEFE)
+    // ============================================
+    app.get("/vacaciones/jefe/aprobar", async (req, res) => {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send("Token inválido");
+    }
+
+    try {
+      // Buscar solicitud
+      const [rows] = await db.promise().query(
+        `
+        SELECT id, token_jefe_expira, aprobado_jefe
+        FROM vacaciones
+        WHERE token_jefe = ?
+        `,
+        [token]
+      );
+
+      if (!rows.length) {
+        return res.status(404).send("Solicitud no encontrada");
+      }
+
+      const solicitud = rows[0];
+
+      // Token expirado
+      if (new Date(solicitud.token_jefe_expira) < new Date()) {
+        return res.status(410).send("⏰ Este enlace ya expiró");
+      }
+
+      // Ya aprobada
+      if (solicitud.aprobado_jefe === 1) {
+        return res.send("✅ Esta solicitud ya fue aprobada");
+      }
+
+      // Aprobar
+      await db.promise().query(
+        `
+        UPDATE vacaciones
+        SET aprobado_jefe = 1,
+            estado = 'Aprobado por Jefe'
+        WHERE id = ?
+        `,
+        [solicitud.id]
+      );
+
+      return res.send(`
+        <html>
+          <body style="font-family:Arial; background:#f3f4f6; padding:40px; text-align:center;">
+            <h2 style="color:#198754;">✅ Vacaciones aprobadas</h2>
+            <p>Gracias. La solicitud fue aprobada correctamente.</p>
+          </body>
+        </html>
+      `);
+
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send("Error al aprobar solicitud");
+    }
+  });
+
+
+  // =======================================
+  // RECHAZAR VACACIONES POR TOKEN (JEFE)
+  // =======================================
+
+  app.get("/vacaciones/jefe/rechazar", async (req, res) => {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send("Token inválido");
+    }
+
+    try {
+      const [rows] = await db.promise().query(
+        `
+        SELECT id, token_jefe_expira
+        FROM vacaciones
+        WHERE token_jefe = ?
+        `,
+        [token]
+      );
+
+      if (!rows.length) {
+        return res.status(404).send("Solicitud no encontrada");
+      }
+
+      const solicitud = rows[0];
+
+      if (new Date(solicitud.token_jefe_expira) < new Date()) {
+        return res.status(410).send("⏰ Este enlace ya expiró");
+      }
+
+      await db.promise().query(
+        `
+        UPDATE vacaciones
+        SET aprobado_jefe = 0,
+            estado = 'Rechazado por Jefe'
+        WHERE id = ?
+        `,
+        [solicitud.id]
+      );
+
+      return res.send(`
+        <html>
+          <body style="font-family:Arial; background:#f3f4f6; padding:40px; text-align:center;">
+            <h2 style="color:#dc3545;">❌ Vacaciones rechazadas</h2>
+            <p>La solicitud fue rechazada correctamente.</p>
+          </body>
+        </html>
+      `);
+
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send("Error al rechazar solicitud");
+    }
+  });
+
 
     // =====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
