@@ -855,7 +855,7 @@ app.post("/vacaciones", async (req, res) => {
   try {
     // Obtener días disponibles del empleado
     const [empRows] = await db.promise().query(
-      "SELECT dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
+      "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
       [empleado_id]
     );
 
@@ -888,11 +888,14 @@ app.post("/vacaciones", async (req, res) => {
       });
     }
 
+    const tokenJefe = crypto.randomBytes(32).toString("hex");
+    const expira = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 horas
+
     // Insertar solicitud si pasa validación
     const sql = `
       INSERT INTO vacaciones 
       (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh, token_jefe, token_jefe_expira)
-      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0 ?, ?)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0, ?, ?)
     `;
 
     const [result] = await db.promise().query(sql, [
@@ -903,21 +906,7 @@ app.post("/vacaciones", async (req, res) => {
       motivo,
       tokenJefe,
       expira
-    ]);
-
-    const tokenJefe = crypto.randomBytes(32).toString("hex");
-    const expira = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 horas
-
-    await db.promise().query(
-      `
-      UPDATE vacaciones 
-      SET token_jefe = ?, token_jefe_expira = ?
-      WHERE empleado_id = ? AND estado = 'Pendiente'
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [tokenJefe, expira, empleado_id]
-    );
+    ]); 
 
     // ==============================================
     // ENVIAR CORREO AL JEFE PARA APROBAR O RECHAZAR
