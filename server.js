@@ -1104,26 +1104,9 @@ app.put("/vacaciones/:id", async (req, res) => {
     // ======================
     try {
       let subject = "";
-      let contenido = "";
 
-      if (estado === "Aprobada") {
-        subject = "Vacaciones aprobadas";
-        contenido = `
-          <h3>Hola ${solicitud.nombre}</h3>
-          <p>Tu solicitud de vacaciones fue <b style="color:green;">APROBADA</b>.</p>
-          <p><strong>Días aprobados:</strong> ${diasSolicitados}</p>
-          <p>Disfruta tu descanso 😊</p>
-        `;
-      }
-
-      if (estado === "Rechazada") {
-        subject = "Vacaciones rechazadas";
-        contenido = `
-          <h3>Hola ${solicitud.nombre}</h3>
-          <p>Tu solicitud de vacaciones fue <b style="color:red;">RECHAZADA</b>.</p>
-          <p>Para más información, contacta a RH.</p>
-        `;
-      }
+      if (estado === "Aprobada") subject = "Vacaciones aprobadas";
+      if (estado === "Rechazada") subject = "Vacaciones rechazadas";
 
       if (subject) {
         const message = `
