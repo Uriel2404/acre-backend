@@ -892,9 +892,9 @@ app.post("/vacaciones", async (req, res) => {
     ]);
 
 
-    // ======================
+    // ====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
-    // ======================
+    // ====================================
     const [empDataRows] = await db.promise().query(
       "SELECT nombre FROM empleados WHERE id = ?",
       [empleado_id]
@@ -908,18 +908,95 @@ app.post("/vacaciones", async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>Nueva Solicitud de Vacaciones</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .wrapper {
+            padding: 30px 10px;
+          }
+
+          .card {
+            max-width: 600px;
+            margin: auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+          }
+
+          .header {
+            background: linear-gradient(135deg, #127726, #1fa84f);
+            color: #ffffff;
+            padding: 22px;
+            text-align: center;
+          }
+
+          .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 0.4px;
+          }
+
+          .content {
+            padding: 25px;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.6;
+          }
+
+          .content p {
+            margin: 8px 0;
+          }
+
+          .label {
+            font-weight: bold;
+            color: #111827;
+          }
+
+          .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 18px 0;
+          }
+
+          .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            background-color: #fef3c7;
+            color: #92400e;
+            letter-spacing: 0.5px;
+          }
+
+          .footer {
+            background-color: #f9fafb;
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+          }
+        </style>
       </head>
 
       <body>
         <div class="wrapper">
           <div class="card">
 
-            <div class="header4">
+            <div class="header">
               <h1>📩 Nueva Solicitud de Vacaciones</h1>
             </div>
 
             <div class="content">
               <p><span class="label">Empleado:</span> ${empleado.nombre}</p>
+
               <div class="divider"></div>
 
               <p><span class="label">Fechas:</span> ${fecha_inicio} al ${fecha_fin}</p>
@@ -927,11 +1004,13 @@ app.post("/vacaciones", async (req, res) => {
 
               <div class="divider"></div>
 
-              <p><span class="label">Estado:</span> 
+              <p>
+                <span class="label">Estado:</span><br>
                 <span class="badge">PENDIENTE</span>
               </p>
 
-              <p><span class="label">Motivo:</span><br>
+              <p>
+                <span class="label">Motivo:</span><br>
                 ${motivo || "No especificado"}
               </p>
             </div>
@@ -946,8 +1025,6 @@ app.post("/vacaciones", async (req, res) => {
       </body>
       </html>
       `;
-
-
       const response = await fetch("https://acre.mx/api/send-mail.php", {
         method: "POST",
         headers: {
@@ -962,12 +1039,6 @@ app.post("/vacaciones", async (req, res) => {
       });
 
       const text = await response.text();
-
-      if (!response.ok) {
-        console.error("❌ Error correo RH:", response.status, text);
-      } else {
-        console.log("✅ Correo RH enviado:", text);
-      }
 
     } catch (err) {
       console.error("❌ Error enviando correo RH:", err);
