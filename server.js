@@ -912,7 +912,7 @@ app.post("/vacaciones", async (req, res) => {
           body {
             margin: 0;
             padding: 0;
-            background-color: #f3f4f6;
+            background-color: #7e00d8ff;
             font-family: Arial, Helvetica, sans-serif;
           }
 
@@ -923,7 +923,7 @@ app.post("/vacaciones", async (req, res) => {
           .card {
             max-width: 600px;
             margin: auto;
-            background: #ffffff;
+            background: #ff0095ff;
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
@@ -931,7 +931,7 @@ app.post("/vacaciones", async (req, res) => {
 
           .header {
             background: linear-gradient(135deg, #127726, #1fa84f);
-            color: #ffffff;
+            color: #ff0000ff;
             padding: 25px;
             text-align: center;
           }
@@ -959,7 +959,7 @@ app.post("/vacaciones", async (req, res) => {
 
           .divider {
             height: 1px;
-            background-color: #e5e7eb;
+            background-color: #0055ffff;
             margin: 20px 0;
           }
 
@@ -968,13 +968,13 @@ app.post("/vacaciones", async (req, res) => {
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 12px;
-            background-color: #fef3c7;
+            background-color: #ffcc00ff;
             color: #92400e;
             font-weight: bold;
           }
 
           .footer {
-            background-color: #f9fafb;
+            background-color: #00ff2aff;
             padding: 15px;
             text-align: center;
             font-size: 12px;
@@ -993,8 +993,6 @@ app.post("/vacaciones", async (req, res) => {
 
             <div class="content">
               <p><span class="label">Empleado:</span> ${empleado.nombre}</p>
-              <p><span class="label">Correo:</span> ${empleado.correo}</p>
-
               <div class="divider"></div>
 
               <p><span class="label">Fechas:</span> ${fecha_inicio} al ${fecha_fin}</p>
