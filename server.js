@@ -1128,58 +1128,112 @@ app.put("/vacaciones/:id", async (req, res) => {
       if (subject) {
         const message = `
       <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-          body {
-            font-family: Arial, Helvetica, sans-serif;
-            background-color: #f4f6f8;
-            padding: 20px;
-          }
-          .container {
-            background-color: #ffffff;
-            max-width: 600px;
-            margin: auto;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-          }
-          .header {
-            background-color: #127726;
-            color: #ffffff;
-            padding: 20px;
-            text-align: center;
-          }
-          .content {
-            padding: 20px;
-            color: #333333;
-          }
-          .footer {
-            background-color: #eeeeee;
-            padding: 10px;
-            text-align: center;
-            font-size: 12px;
-            color: #666666;
-          }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>Intranet Acre Residencial</h2>
-            </div>
-            <div class="content">
-              ${contenido}
-            </div>
-            <div class="footer">
-              Este correo fue enviado automáticamente por la Intranet Acre Residencial.<br>
-              No respondas a este mensaje.
-            </div>
-          </div>
-        </body>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>${subject}</title>
+      </head>
+
+      <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
+          <tr>
+            <td align="center">
+
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
+
+                <!-- HEADER -->
+                <tr>
+                  <td style="background-color:#127726; padding:20px; text-align:center;">
+                    <h2 style="margin:0; color:#ffffff; font-size:20px;">
+                      Intranet ACRE Residencial
+                    </h2>
+                  </td>
+                </tr>
+
+                <!-- CONTENT -->
+                <tr>
+                  <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
+
+                    <p style="margin-top:0;">
+                      Hola <strong>${solicitud.nombre}</strong>,
+                    </p>
+
+                    ${
+                      estado === "Aprobada"
+                        ? `
+                        <p>
+                          Tu solicitud de vacaciones fue 
+                          <strong style="color:#127726;">APROBADA</strong>.
+                        </p>
+
+                        <p>
+                          <strong>Días aprobados:</strong> ${diasSolicitados}
+                        </p>
+
+                        <p>
+                          ¡Disfruta tu descanso! 😊
+                        </p>
+
+                        <div style="
+                          margin-top:15px;
+                          display:inline-block;
+                          padding:8px 18px;
+                          background-color:#dcfce7;
+                          color:#166534;
+                          border-radius:20px;
+                          font-size:12px;
+                          font-weight:bold;
+                        ">
+                          ✔ Solicitud aprobada
+                        </div>
+                        `
+                        : `
+                        <p>
+                          Tu solicitud de vacaciones fue 
+                          <strong style="color:#b91c1c;">RECHAZADA</strong>.
+                        </p>
+
+                        <p>
+                          Para más información, por favor contacta al área de Recursos Humanos.
+                        </p>
+
+                        <div style="
+                          margin-top:15px;
+                          display:inline-block;
+                          padding:8px 18px;
+                          background-color:#fee2e2;
+                          color:#7f1d1d;
+                          border-radius:20px;
+                          font-size:12px;
+                          font-weight:bold;
+                        ">
+                          ✖ Solicitud rechazada
+                        </div>
+                        `
+                    }
+
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                  <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+                    Este correo fue enviado automáticamente por la Intranet ACRE Residencial.<br>
+                    No respondas a este mensaje.
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+        </table>
+
+      </body>
       </html>
-    `;
+      `;
+
         await fetch("https://acre.mx/api/send-mail.php", {
           method: "POST",
           headers: {
