@@ -966,6 +966,27 @@ app.post("/vacaciones", async (req, res) => {
     </html>
     `;
 
+      try {
+      const responseJefe = await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: jefe.correo, 
+          subject: "Solicitud de vacaciones por aprobar",
+          message: mensajeJefe
+        })
+      });
+
+      const textJefe = await responseJefe.text();
+      console.log("📨 Correo enviado al jefe:", jefe.correo);
+
+    } catch (err) {
+      console.error("❌ Error enviando correo al jefe:", err);
+    }
+
     // =====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
     // ====================================
