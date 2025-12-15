@@ -863,9 +863,10 @@ app.post("/vacaciones", async (req, res) => {
       return res.status(404).json({ error: "Empleado no encontrado" });
     }
 
+    const empleado = empRows[0];
     const disponibles = empRows[0].dias_vacaciones;
-
     const jefe_id = empRows[0].jefe_id;
+
     if (!jefe_id) {
       return res.status(400).json({
         error: true,
@@ -968,11 +969,7 @@ app.post("/vacaciones", async (req, res) => {
     // =====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
     // ====================================
-    const [empDataRows] = await db.promise().query(
-      "SELECT nombre FROM empleados WHERE id = ?",
-      [empleado_id]
-    );
-    const empleado = empDataRows[0];
+
     try {
       const subjectRH = "Nueva solicitud de vacaciones";
       const messageRH = `
