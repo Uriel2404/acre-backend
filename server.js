@@ -891,8 +891,8 @@ app.post("/vacaciones", async (req, res) => {
     // Insertar solicitud si pasa validación
     const sql = `
       INSERT INTO vacaciones 
-      (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh)
-      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0)
+      (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh, token_jefe, token_jefe_expira)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0 ?, ?)
     `;
 
     const [result] = await db.promise().query(sql, [
@@ -900,7 +900,9 @@ app.post("/vacaciones", async (req, res) => {
       jefe_id,
       fecha_inicio,
       fecha_fin,
-      motivo
+      motivo,
+      tokenJefe,
+      expira
     ]);
 
     const tokenJefe = crypto.randomBytes(32).toString("hex");
