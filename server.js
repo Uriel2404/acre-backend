@@ -997,20 +997,21 @@ app.put("/vacaciones/:id", async (req, res) => {
     // ======================
     try {
       let subject = "";
-      let message = "";
+      let contenido = "";
 
       if (estado === "Aprobada") {
         subject = "Vacaciones aprobadas";
-        message = `
+        contenido = `
           <h3>Hola ${solicitud.nombre}</h3>
           <p>Tu solicitud de vacaciones fue <b style="color:green;">APROBADA</b>.</p>
           <p><strong>Días aprobados:</strong> ${diasSolicitados}</p>
+          <p>Disfruta tu descanso 😊</p>
         `;
       }
 
       if (estado === "Rechazada") {
         subject = "Vacaciones rechazadas";
-        message = `
+        contenido = `
           <h3>Hola ${solicitud.nombre}</h3>
           <p>Tu solicitud de vacaciones fue <b style="color:red;">RECHAZADA</b>.</p>
           <p>Para más información, contacta a RH.</p>
@@ -1018,6 +1019,60 @@ app.put("/vacaciones/:id", async (req, res) => {
       }
 
       if (subject) {
+        const message = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f6f8;
+            padding: 20px;
+          }
+          .container {
+            background-color: #ffffff;
+            max-width: 600px;
+            margin: auto;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          }
+          .header {
+            background-color: #127726;
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+          }
+          .content {
+            padding: 20px;
+            color: #333333;
+          }
+          .footer {
+            background-color: #eeeeee;
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+            color: #666666;
+          }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>ACRE Intranet</h2>
+            </div>
+            <div class="content">
+              ${contenido}
+            </div>
+            <div class="footer">
+              Este correo fue enviado automáticamente por la Intranet ACRE.<br>
+              No respondas a este mensaje.
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
         await fetch("https://acre.mx/api/send-mail.php", {
           method: "POST",
           headers: {
@@ -1076,25 +1131,5 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
   } catch (err) {
     console.error("ERROR GET /vacaciones/empleado/:id:", err);
     res.status(500).json({ error: "Error al obtener historial" });
-  }
-});
-
-//===============================================================
-//                  T E S T   D E   C O R R E O S
-// ===============================================================
-
-app.get("/test-mail", async (req, res) => {
-  try {
-    await transporter.sendMail({
-      from: `"Intranet ACRE" <intranet@acre.mx>`,
-      to: "TU_CORREO_PERSONAL@gmail.com",
-      subject: "Prueba SMTP cPanel",
-      text: "Si recibes este correo, SMTP con cPanel funciona correctamente 🚀",
-    });
-
-    res.json({ ok: true, message: "Correo enviado correctamente" });
-  } catch (err) {
-    console.error("ERROR SMTP:", err);
-    res.status(500).json({ error: err.message });
   }
 });
