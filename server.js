@@ -908,8 +908,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     const jefe = jefeRows[0];
 
-    const linkAprobar = `https://acre.mx/api/vacaciones/jefe/aprobar?token=${tokenJefe}`;
-    const linkRechazar = `https://acre.mx/api/vacaciones/jefe/rechazar?token=${tokenJefe}`;
+    const linkAprobar = `https://acre-backend.onrender.com/vacaciones/jefe/aprobar?token=${tokenJefe}`;
+    const linkRechazar = `https://acre-backend.onrender.com/vacaciones/jefe/rechazar?token=${tokenJefe}`;
 
     const mensajeJefe = `
     <!DOCTYPE html>
