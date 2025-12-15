@@ -908,123 +908,77 @@ app.post("/vacaciones", async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>Nueva Solicitud de Vacaciones</title>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-            font-family: Arial, Helvetica, sans-serif;
-          }
-
-          .wrapper {
-            padding: 30px 10px;
-          }
-
-          .card {
-            max-width: 600px;
-            margin: auto;
-            background-color: #ffffff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-          }
-
-          .header {
-            background: linear-gradient(135deg, #127726, #1fa84f);
-            color: #ffffff;
-            padding: 22px;
-            text-align: center;
-          }
-
-          .header h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: bold;
-            letter-spacing: 0.4px;
-          }
-
-          .content {
-            padding: 25px;
-            color: #374151;
-            font-size: 14px;
-            line-height: 1.6;
-          }
-
-          .content p {
-            margin: 8px 0;
-          }
-
-          .label {
-            font-weight: bold;
-            color: #111827;
-          }
-
-          .divider {
-            height: 1px;
-            background-color: #e5e7eb;
-            margin: 18px 0;
-          }
-
-          .badge {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            background-color: #fef3c7;
-            color: #92400e;
-            letter-spacing: 0.5px;
-          }
-
-          .footer {
-            background-color: #f9fafb;
-            padding: 15px;
-            text-align: center;
-            font-size: 12px;
-            color: #6b7280;
-          }
-        </style>
       </head>
 
-      <body>
-        <div class="wrapper">
-          <div class="card">
+      <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
 
-            <div class="header">
-              <h1>📩 Nueva Solicitud de Vacaciones</h1>
-            </div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
+          <tr>
+            <td align="center">
 
-            <div class="content">
-              <p><span class="label">Empleado:</span> ${empleado.nombre}</p>
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
 
-              <div class="divider"></div>
+                <!-- HEADER -->
+                <tr>
+                  <td style="background-color:#127726; padding:20px; text-align:center;">
+                    <h1 style="margin:0; color:#ffffff; font-size:22px;">
+                      📩 Nueva Solicitud de Vacaciones
+                    </h1>
+                  </td>
+                </tr>
 
-              <p><span class="label">Fechas:</span> ${fecha_inicio} al ${fecha_fin}</p>
-              <p><span class="label">Días solicitados:</span> ${diasSolicitados}</p>
+                <!-- CONTENT -->
+                <tr>
+                  <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
 
-              <div class="divider"></div>
+                    <p><strong>Empleado:</strong> ${empleado.nombre}</p>
 
-              <p>
-                <span class="label">Estado:</span><br>
-                <span class="badge">PENDIENTE</span>
-              </p>
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
 
-              <p>
-                <span class="label">Motivo:</span><br>
-                ${motivo || "No especificado"}
-              </p>
-            </div>
+                    <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+                    <p><strong>Días solicitados:</strong> ${diasSolicitados}</p>
 
-            <div class="footer">
-              Mensaje automático generado por la Intranet ACRE<br>
-              No responder este correo
-            </div>
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
 
-          </div>
-        </div>
+                    <p><strong>Estado:</strong></p>
+
+                    <span style="
+                      display:inline-block;
+                      padding:6px 14px;
+                      background-color:#fef3c7;
+                      color:#92400e;
+                      border-radius:20px;
+                      font-size:12px;
+                      font-weight:bold;
+                    ">
+                      PENDIENTE
+                    </span>
+
+                    <p style="margin-top:15px;"><strong>Motivo:</strong><br>
+                      ${motivo || "No especificado"}
+                    </p>
+
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                  <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+                    Mensaje automático generado por la Intranet ACRE<br>
+                    No responder este correo
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+        </table>
+
       </body>
       </html>
       `;
+
       const response = await fetch("https://acre.mx/api/send-mail.php", {
         method: "POST",
         headers: {
