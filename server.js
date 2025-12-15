@@ -892,7 +892,7 @@ app.post("/vacaciones", async (req, res) => {
     const sql = `
       INSERT INTO vacaciones 
       (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh)
-      VALUES (?,NPM INSTALL CRYPTO ?, ?, ?, ?, 'Pendiente', 0, 0)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0)
     `;
 
     const [result] = await db.promise().query(sql, [
