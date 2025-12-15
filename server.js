@@ -929,14 +929,14 @@ app.post("/vacaciones", async (req, res) => {
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
           }
 
-          .header {
+          .header4 {
             background: linear-gradient(135deg, #127726, #1fa84f);
             color: #ff0000ff;
             padding: 25px;
             text-align: center;
           }
 
-          .header h1 {
+          .header4 h1 {
             margin: 0;
             font-size: 22px;
             letter-spacing: 0.5px;
@@ -987,7 +987,7 @@ app.post("/vacaciones", async (req, res) => {
         <div class="wrapper">
           <div class="card">
 
-            <div class="header">
+            <div class="header4">
               <h1>📩 Nueva Solicitud de Vacaciones</h1>
             </div>
 
