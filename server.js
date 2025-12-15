@@ -1155,7 +1155,7 @@ app.put("/vacaciones/:id", async (req, res) => {
         </html>
       `;
 
-      await fetch("https://acre.mx/api/send-mail.php", {
+      const response = await fetch("https://acre.mx/api/send-mail.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1167,6 +1167,15 @@ app.put("/vacaciones/:id", async (req, res) => {
           message: messageRH
         })
       });
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        console.error("❌ Error PHP RH:", response.status, text);
+      } else {
+        console.log("✅ Correo RH enviado:", text);
+      }
+
 
     } catch (rhError) {
       console.error("❌ Error enviando correo a RH:", rhError);
