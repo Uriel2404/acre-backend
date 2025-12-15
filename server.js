@@ -895,6 +895,11 @@ app.post("/vacaciones", async (req, res) => {
     // ======================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
     // ======================
+    const [empDataRows] = await db.promise().query(
+      "SELECT nombre FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
+    const empleado = empDataRows[0];
     try {
       const subjectRH = "Nueva solicitud de vacaciones";
       const messageRH = `
