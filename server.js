@@ -1097,6 +1097,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
   // ============================================
   app.get("/vacaciones/jefe/aprobar", async (req, res) => {
     const { token } = req.query;
+    
+    console.log("🔑 Token recibido:", token);
 
     if (!token) {
       return res.status(400).send("Token inválido");
@@ -1104,6 +1106,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       // Buscar solicitud
+      console.log("🔍 Buscando solicitud con token...");
+
       const [rows] = await db.promise().query(
         `
         SELECT id, token_jefe_expira, aprobado_jefe
@@ -1112,6 +1116,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
         `,
         [token]
       );
+      
+      console.log("📄 Resultado BD:", rows);
 
       if (!rows.length) {
         return res.status(404).send("Solicitud no encontrada");
@@ -1130,15 +1136,17 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       // Aprobar
+      console.log("🟢 Aprobando solicitud ID:", solicitud.id);
       await db.promise().query(
         `
         UPDATE vacaciones
         SET aprobado_jefe = 1,
-            estado = 'Aprobado por Jefe'
+            estado = 'Pendiente RH'
         WHERE id = ?
         `,
         [solicitud.id]
       );
+
 
       return res.send(`
         <html>
@@ -1191,11 +1199,12 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
         `
         UPDATE vacaciones
         SET aprobado_jefe = 0,
-            estado = 'Rechazado por Jefe'
+          estado = 'Rechazada'
         WHERE id = ?
         `,
         [solicitud.id]
       );
+
 
       return res.send(`
         <html>
@@ -1237,14 +1246,17 @@ app.get("/vacaciones", async (req, res) => {
 });
 
 //===============================
-// APROBAR O RECHAZAR SOLICITUDES
+// APROBAR O RECHAZAR SOLICITUDES RH
 //===============================
 
 app.put("/vacaciones/:id", async (req, res) => {
   const { id } = req.params;
   const { estado } = req.body;
 
-  if (!estado) return res.status(400).json({ error: "Estado requerido" });
+  const estadosPermitidos = ["Aprobada", "Rechazada"];
+  if (!estadosPermitidos .includes (estado)) {
+    return res.status(400).json({ error: "Estado no permitido" })
+  };
 
   const conn = await db.promise().getConnection();
   try {
@@ -1268,6 +1280,14 @@ app.put("/vacaciones/:id", async (req, res) => {
 
     const solicitud = rows[0];
 
+    if (solicitud.estado_actual !== "Pendiente RH") {
+      await conn.rollback();
+      return res.status(400).json({
+        error: "La solicitud aún no ha sido aprobada por el jefe"
+      });
+    }
+
+
     // calcular dias solicitados (incluyendo el día final)
     const inicio = new Date(solicitud.fecha_inicio);
     const fin = new Date(solicitud.fecha_fin);
@@ -1289,7 +1309,14 @@ app.put("/vacaciones/:id", async (req, res) => {
     }
 
     // 2) Actualizar estado de la solicitud
-    await conn.query("UPDATE vacaciones SET estado = ? WHERE id = ?", [estado, id]);
+    await conn.query(
+      `
+      UPDATE vacaciones
+      SET estado = ?, aprobado_rh = ?
+      WHERE id = ?
+      `,
+      [estado, estado === "Aprobada" ? 1 : 0, id]
+    );
 
     // 3) Si fue aprobada -> restar dias en empleados
     if (estado === "Aprobada") {
@@ -1438,13 +1465,16 @@ app.put("/vacaciones/:id", async (req, res) => {
       console.error("❌ Error enviando correo a empleado:", mailError);
     }
 
-    return res.json({ ok: true, message: "Estado actualizado", diasSolicitados });
+    return res.json({ ok: true, message: `Solicitud ${estado.toLowerCase()} correctamente`});
 
   } catch (err) {
     await conn.rollback().catch(() => {});
     conn.release();
+    
     console.error("ERROR PUT /vacaciones/:id", err);
-    return res.status(500).json({ error: "Error al actualizar solicitud" });
+    return res.status(500).json({ error: "Error procesando solicitud RH" });
+  } finally {
+    conn.release();
   }
 });
 
