@@ -1283,9 +1283,10 @@ app.put("/vacaciones/:id", async (req, res) => {
     if (solicitud.estado_actual !== "Pendiente RH") {
       await conn.rollback();
       return res.status(400).json({
-        error: "La solicitud aún no ha sido aprobada por el jefe"
+        error: `La solicitud no puede ser procesada en estado: ${solicitud.estado_actual}`
       });
     }
+
 
 
     // calcular dias solicitados (incluyendo el día final)
@@ -1327,7 +1328,6 @@ app.put("/vacaciones/:id", async (req, res) => {
     }
 
     await conn.commit();
-    conn.release();
 
     // ======================
     // ENVIAR CORREO A EMPLEADO
