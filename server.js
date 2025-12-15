@@ -993,7 +993,7 @@ app.put("/vacaciones/:id", async (req, res) => {
     conn.release();
 
     // ======================
-    // ENVIAR CORREO
+    // ENVIAR CORREO A EMPLEADO
     // ======================
     try {
       let subject = "";
@@ -1060,13 +1060,13 @@ app.put("/vacaciones/:id", async (req, res) => {
         <body>
           <div class="container">
             <div class="header">
-              <h2>ACRE Intranet</h2>
+              <h2>Intranet Acre Residencial</h2>
             </div>
             <div class="content">
               ${contenido}
             </div>
             <div class="footer">
-              Este correo fue enviado automáticamente por la Intranet ACRE.<br>
+              Este correo fue enviado automáticamente por la Intranet Acre Residencial.<br>
               No respondas a este mensaje.
             </div>
           </div>
@@ -1088,8 +1088,90 @@ app.put("/vacaciones/:id", async (req, res) => {
       }
 
     } catch (mailError) {
-      console.error("❌ Error enviando correo:", mailError);
+      console.error("❌ Error enviando correo a empleado:", mailError);
     }
+
+    // ======================
+    // ENVIAR CORREO A RH
+    // ======================
+    try {
+      const subjectRH = `Solicitud de vacaciones ${estado}`;
+      const messageRH = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              background-color: #f4f6f8;
+              padding: 20px;
+            }
+            .container {
+              background-color: #ffffff;
+              max-width: 600px;
+              margin: auto;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            }
+            .header {
+              background-color: #1f2937;
+              color: #ffffff;
+              padding: 20px;
+              text-align: center;
+            }
+            .content {
+              padding: 20px;
+              color: #333333;
+            }
+            .footer {
+              background-color: #eeeeee;
+              padding: 10px;
+              text-align: center;
+              font-size: 12px;
+              color: #666666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>Notificación RH - Intranet ACRE</h2>
+            </div>
+
+            <div class="content">
+              <p><strong>Empleado:</strong> ${solicitud.nombre}</p>
+              <p><strong>Estado de la solicitud:</strong> ${estado}</p>
+              <p><strong>Fechas:</strong> ${solicitud.fecha_inicio} al ${solicitud.fecha_fin}</p>
+              <p><strong>Días solicitados:</strong> ${diasSolicitados}</p>
+            </div>
+
+            <div class="footer">
+              Mensaje automático del sistema de Intranet ACRE
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: "uriel.ruiz@acre.mx",
+          subject: subjectRH,
+          message: messageRH
+        })
+      });
+
+    } catch (rhError) {
+      console.error("❌ Error enviando correo a RH:", rhError);
+    }
+
 
     return res.json({ ok: true, message: "Estado actualizado", diasSolicitados });
 
