@@ -903,19 +903,125 @@ app.post("/vacaciones", async (req, res) => {
     try {
       const subjectRH = "Nueva solicitud de vacaciones";
       const messageRH = `
-        <!DOCTYPE html>
-        <html>
-        <body style="font-family: Arial;">
-          <h3>Nueva solicitud de vacaciones</h3>
-          <p><strong>Empleado:</strong> ${empleado.nombre}</p>
-          <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
-          <p><strong>Días solicitados:</strong> ${diasSolicitados}</p>
-          <p><strong>Motivo:</strong> ${motivo || "No especificado"}</p>
-          <hr />
-          <p>Ingresa a la Intranet para aprobar o rechazar.</p>
-        </body>
-        </html>
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Nueva Solicitud de Vacaciones</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+
+          .wrapper {
+            padding: 30px 10px;
+          }
+
+          .card {
+            max-width: 600px;
+            margin: auto;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+          }
+
+          .header {
+            background: linear-gradient(135deg, #127726, #1fa84f);
+            color: #ffffff;
+            padding: 25px;
+            text-align: center;
+          }
+
+          .header h1 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: 0.5px;
+          }
+
+          .content {
+            padding: 25px;
+            color: #374151;
+          }
+
+          .content p {
+            margin: 8px 0;
+            font-size: 14px;
+          }
+
+          .label {
+            font-weight: bold;
+            color: #111827;
+          }
+
+          .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 20px 0;
+          }
+
+          .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            background-color: #fef3c7;
+            color: #92400e;
+            font-weight: bold;
+          }
+
+          .footer {
+            background-color: #f9fafb;
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="wrapper">
+          <div class="card">
+
+            <div class="header">
+              <h1>📩 Nueva Solicitud de Vacaciones</h1>
+            </div>
+
+            <div class="content">
+              <p><span class="label">Empleado:</span> ${empleado.nombre}</p>
+              <p><span class="label">Correo:</span> ${empleado.correo}</p>
+
+              <div class="divider"></div>
+
+              <p><span class="label">Fechas:</span> ${fecha_inicio} al ${fecha_fin}</p>
+              <p><span class="label">Días solicitados:</span> ${diasSolicitados}</p>
+
+              <div class="divider"></div>
+
+              <p><span class="label">Estado:</span> 
+                <span class="badge">PENDIENTE</span>
+              </p>
+
+              <p><span class="label">Motivo:</span><br>
+                ${motivo || "No especificado"}
+              </p>
+            </div>
+
+            <div class="footer">
+              Mensaje automático generado por la Intranet ACRE<br>
+              No responder este correo
+            </div>
+
+          </div>
+        </div>
+      </body>
+      </html>
       `;
+
 
       const response = await fetch("https://acre.mx/api/send-mail.php", {
         method: "POST",
