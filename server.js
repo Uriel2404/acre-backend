@@ -6,7 +6,8 @@ import multer from "multer";
 import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
-import nodemailer from "nodemailer";
+import crypto from "crypto";
+
 
 dotenv.config();
 
@@ -891,7 +892,7 @@ app.post("/vacaciones", async (req, res) => {
     const sql = `
       INSERT INTO vacaciones 
       (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh)
-      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0)
+      VALUES (?,NPM INSTALL CRYPTO ?, ?, ?, ?, 'Pendiente', 0, 0)
     `;
 
     const [result] = await db.promise().query(sql, [
@@ -902,6 +903,76 @@ app.post("/vacaciones", async (req, res) => {
       motivo
     ]);
 
+    const tokenJefe = crypto.randomBytes(32).toString("hex");
+    const expira = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 horas
+
+    await db.promise().query(
+      `
+      UPDATE vacaciones 
+      SET token_jefe = ?, token_jefe_expira = ?
+      WHERE empleado_id = ? AND estado = 'Pendiente'
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [tokenJefe, expira, empleado_id]
+    );
+
+    // ==============================================
+    // ENVIAR CORREO AL JEFE PARA APROBAR O RECHAZAR
+    // ==============================================
+
+    // Obtener datos del jefe
+    const [jefeRows] = await db.promise().query(
+      "SELECT nombre, correo FROM empleados WHERE id = ?",
+      [jefe_id]
+    );
+
+    const jefe = jefeRows[0];
+
+    const linkAprobar = `https://acre.mx/api/vacaciones/jefe/aprobar?token=${tokenJefe}`;
+    const linkRechazar = `https://acre.mx/api/vacaciones/jefe/rechazar?token=${tokenJefe}`;
+
+    const mensajeJefe = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+      <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+        <tr>
+          <td style="background:#0f5132; color:#ffffff; padding:20px; text-align:center;">
+            <h2>Nueva solicitud de vacaciones</h2>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px; color:#333;">
+            <p>Hola <strong>${jefe.nombre}</strong>,</p>
+            <p>${empleado.nombre} ha solicitado vacaciones.</p>
+
+            <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+
+            <div style="margin-top:25px; text-align:center;">
+              <a href="${linkAprobar}"
+                style="background:#198754; color:#fff; padding:12px 20px;
+                      text-decoration:none; border-radius:6px; margin-right:10px;">
+                ✅ Aprobar
+              </a>
+
+              <a href="${linkRechazar}"
+                style="background:#dc3545; color:#fff; padding:12px 20px;
+                      text-decoration:none; border-radius:6px;">
+                ❌ Rechazar
+              </a>
+            </div>
+
+            <p style="margin-top:30px; font-size:12px; color:#777;">
+              Este enlace es personal y expira en 48 horas.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `;
 
     // =====================================
     // ENVIAR CORREO A RH (NUEVA SOLICITUD)
