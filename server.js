@@ -854,7 +854,7 @@ app.post("/vacaciones", async (req, res) => {
   try {
     // Obtener días disponibles del empleado
     const [empRows] = await db.promise().query(
-      "SELECT dias_vacaciones FROM empleados WHERE id = ?",
+      "SELECT dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
       [empleado_id]
     );
 
@@ -863,6 +863,15 @@ app.post("/vacaciones", async (req, res) => {
     }
 
     const disponibles = empRows[0].dias_vacaciones;
+
+    const jefe_id = empRows[0].jefe_id;
+    if (!jefe_id) {
+      return res.status(400).json({
+        error: true,
+        message: "No tienes un jefe directo asignado. Contacta a RH."
+      });
+    }
+
 
     // Calcular días solicitados
     const inicio = new Date(fecha_inicio);
@@ -880,12 +889,14 @@ app.post("/vacaciones", async (req, res) => {
 
     // Insertar solicitud si pasa validación
     const sql = `
-      INSERT INTO vacaciones (empleado_id, fecha_inicio, fecha_fin, motivo, estado)
-      VALUES (?, ?, ?, ?, 'Pendiente')
+      INSERT INTO vacaciones 
+      (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente', 0, 0)
     `;
 
     const [result] = await db.promise().query(sql, [
       empleado_id,
+      jefe_id,
       fecha_inicio,
       fecha_fin,
       motivo
