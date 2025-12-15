@@ -986,7 +986,7 @@ app.post("/vacaciones", async (req, res) => {
           "X-API-KEY": process.env.MAIL_API_KEY
         },
         body: JSON.stringify({
-          to: "uriel.ruiz@acre.mx", // RH
+          to: "uriel.ruiz@acre.mx", // CAMBIAR POR CORREO RH CUANDO YA ESTÉ FUNCIONANDO AL 100%
           subject: subjectRH,
           message: messageRH
         })
