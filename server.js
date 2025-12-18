@@ -1602,7 +1602,7 @@ function calcularDiasBasePorAntiguedad(fechaIngreso) {
 // ===========================================
 // ENPOINT PARA RENOVACIÓN DE DÍAS ACUMULADOS
 // ===========================================
-router.post("/vacaciones/renovar", async (req, res) => {
+app.post("/vacaciones/renovar", async (req, res) => {
   const hoy = new Date();
   const mesExpiracion = new Date();
   mesExpiracion.setMonth(hoy.getMonth() + 2);
@@ -1671,7 +1671,7 @@ router.post("/vacaciones/renovar", async (req, res) => {
 // ==============================
 import { expirarDiasAcumulados } from "./vacaciones.service.js";
 
-router.post("/vacaciones/expirar", async (req, res) => {
+app.post("/vacaciones/expirar", async (req, res) => {
   try {
     const total = await expirarDiasAcumulados(db);
     res.json({
