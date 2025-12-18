@@ -7,6 +7,7 @@ import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import "./vacaciones.cron.js";
 
 
 dotenv.config();
@@ -1663,3 +1664,22 @@ router.post("/vacaciones/renovar", async (req, res) => {
   }
 });
 
+
+
+// ==============================
+// ENPOINT PARA EXPIRAR DÍAS ACUMULADOS
+// ==============================
+import { expirarDiasAcumulados } from "../services/vacaciones.service.js";
+
+router.post("/vacaciones/expirar", async (req, res) => {
+  try {
+    const total = await expirarDiasAcumulados(db);
+    res.json({
+      message: "Expiración completada",
+      empleados_afectados: total
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al expirar vacaciones" });
+  }
+});
