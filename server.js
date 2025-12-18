@@ -7,7 +7,6 @@ import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import "./vacaciones.cron.js";
 
 
 dotenv.config();
@@ -855,7 +854,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       const [empRows] = await db.promise().query(
-        "SELECT nombre, dias_base, jefe_id FROM empleados WHERE id = ?",
+        "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
 
@@ -864,7 +863,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       const empleado = empRows[0];
-      const disponibles = empleado.dias_base;
+      const disponibles = empleado.dias_vacaciones;
       const jefe_id = empleado.jefe_id;
 
       if (!jefe_id) {
@@ -1233,7 +1232,7 @@ app.get("/vacaciones", async (req, res) => {
   try {
     const sql = `
       SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.motivo, v.estado,
-             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_base
+             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_vacaciones
       FROM vacaciones v
       LEFT JOIN empleados e ON v.empleado_id = e.id
       ORDER BY v.id DESC
@@ -1309,7 +1308,8 @@ app.put("/vacaciones/:id", async (req, res) => {
       diasAcumuladosValidos = 0;
     }
 
-    const diasDisponibles = solicitud.dias_base + diasAcumuladosValidos;
+    const diasDisponibles =
+      solicitud.dias_base + diasAcumuladosValidos;
 
 
     // Si apruebas, validar días disponibles
@@ -1546,7 +1546,7 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
         v.estado,
         v.fecha_solicitud,
         e.nombre,
-        e.dias_base
+        e.dias_vacaciones
       FROM vacaciones v
       INNER JOIN empleados e ON v.empleado_id = e.id
       WHERE v.empleado_id = ?
@@ -1559,125 +1559,5 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
   } catch (err) {
     console.error("ERROR GET /vacaciones/empleado/:id:", err);
     res.status(500).json({ error: "Error al obtener historial" });
-  }
-});
-
-
-// =====================================================
-//       CALCULAR LÓGICA DE DÍAS DE VACACIONES
-// =====================================================
-
-function calcularDiasBasePorAntiguedad(fechaIngreso) {
-  const hoy = new Date();
-  const ingreso = new Date(fechaIngreso);
-
-  let anios = hoy.getFullYear() - ingreso.getFullYear();
-
-  const aniversarioEsteAnio = new Date(
-    hoy.getFullYear(),
-    ingreso.getMonth(),
-    ingreso.getDate()
-  );
-
-  if (hoy < aniversarioEsteAnio) {
-    anios--;
-  }
-
-  if (anios < 1) return 0;
-  if (anios === 1) return 12;
-  if (anios === 2) return 14;
-  if (anios === 3) return 16;
-  if (anios === 4) return 18;
-  if (anios === 5) return 20;
-  if (anios <= 10) return 22;
-  if (anios <= 15) return 24;
-  if (anios <= 20) return 26;
-  if (anios <= 25) return 28;
-  if (anios <= 30) return 30;
-  return 32;
-}
-
-
-// ===========================================
-// ENPOINT PARA RENOVACIÓN DE DÍAS ACUMULADOS
-// ===========================================
-app.post("/vacaciones/renovar", async (req, res) => {
-  const hoy = new Date();
-  const mesExpiracion = new Date();
-  mesExpiracion.setMonth(hoy.getMonth() + 2);
-
-  try {
-    const [empleados] = await db.query(`
-      SELECT *
-      FROM empleados
-      WHERE fecha_ingreso IS NOT NULL
-    `);
-
-    for (const emp of empleados) {
-      const ingreso = new Date(emp.fecha_ingreso);
-
-      const aniversario = new Date(
-        hoy.getFullYear(),
-        ingreso.getMonth(),
-        ingreso.getDate()
-      );
-
-      if (hoy < aniversario) continue;
-
-      if (
-        emp.ultimo_aniversario &&
-        new Date(emp.ultimo_aniversario).getFullYear() === hoy.getFullYear()
-      ) {
-        continue;
-      }
-
-      const diasBase = calcularDiasBasePorAntiguedad(emp.fecha_ingreso);
-
-      const sobrantes = emp.dias_base || 0;
-
-      await db.query(
-        `
-        UPDATE empleados SET
-          dias_acumulados = ?,
-          dias_base = ?,
-          ultimo_aniversario = ?,
-          fecha_expiracion = ?
-        WHERE id = ?
-        `,
-        [
-          sobrantes,
-          diasBase,
-          diasBase + sobrantes,
-          hoy,
-          mesExpiracion,
-          emp.id,
-        ]
-      );
-    }
-
-    res.json({ message: "Renovación de vacaciones completada" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error en renovación de vacaciones" });
-  }
-});
-
-
-
-// ==============================
-// ENPOINT PARA EXPIRAR DÍAS ACUMULADOS
-// ==============================
-import { expirarDiasAcumulados } from "./vacaciones.service.js";
-
-app.post("/vacaciones/expirar", async (req, res) => {
-  try {
-    const total = await expirarDiasAcumulados(db);
-    res.json({
-      message: "Expiración completada",
-      empleados_afectados: total
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error al expirar vacaciones" });
   }
 });
