@@ -1233,7 +1233,7 @@ app.get("/vacaciones", async (req, res) => {
   try {
     const sql = `
       SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.motivo, v.estado,
-             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_vacaciones
+             e.id AS emp_id, e.nombre AS nombre_empleado, e.dias_base
       FROM vacaciones v
       LEFT JOIN empleados e ON v.empleado_id = e.id
       ORDER BY v.id DESC
@@ -1546,7 +1546,7 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
         v.estado,
         v.fecha_solicitud,
         e.nombre,
-        e.dias_vacaciones
+        e.dias_base
       FROM vacaciones v
       INNER JOIN empleados e ON v.empleado_id = e.id
       WHERE v.empleado_id = ?
@@ -1633,14 +1633,13 @@ app.post("/vacaciones/renovar", async (req, res) => {
 
       const diasBase = calcularDiasBasePorAntiguedad(emp.fecha_ingreso);
 
-      const sobrantes = emp.dias_vacaciones || 0;
+      const sobrantes = emp.dias_base || 0;
 
       await db.query(
         `
         UPDATE empleados SET
           dias_acumulados = ?,
           dias_base = ?,
-          dias_vacaciones = ?,
           ultimo_aniversario = ?,
           fecha_expiracion = ?
         WHERE id = ?
