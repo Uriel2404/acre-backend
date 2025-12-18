@@ -1669,7 +1669,7 @@ router.post("/vacaciones/renovar", async (req, res) => {
 // ==============================
 // ENPOINT PARA EXPIRAR DÍAS ACUMULADOS
 // ==============================
-import { expirarDiasAcumulados } from "../services/vacaciones.service.js";
+import { expirarDiasAcumulados } from "./vacaciones.service.js";
 
 router.post("/vacaciones/expirar", async (req, res) => {
   try {
