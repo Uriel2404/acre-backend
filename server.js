@@ -864,7 +864,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       const empleado = empRows[0];
-      const disponibles = empleado.dias_vacaciones;
+      const disponibles = empleado.dias_base + empleado.dias_acumulados;
       const jefe_id = empleado.jefe_id;
 
       if (!jefe_id) {
@@ -1309,8 +1309,7 @@ app.put("/vacaciones/:id", async (req, res) => {
       diasAcumuladosValidos = 0;
     }
 
-    const diasDisponibles =
-      solicitud.dias_base + diasAcumuladosValidos;
+    const diasDisponibles = solicitud.dias_base + diasAcumuladosValidos;
 
 
     // Si apruebas, validar días disponibles
