@@ -1561,3 +1561,105 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener historial" });
   }
 });
+
+
+// =====================================================
+//       CALCULAR LÓGICA DE DÍAS DE VACACIONES
+// =====================================================
+
+function calcularDiasBasePorAntiguedad(fechaIngreso) {
+  const hoy = new Date();
+  const ingreso = new Date(fechaIngreso);
+
+  let anios = hoy.getFullYear() - ingreso.getFullYear();
+
+  const aniversarioEsteAnio = new Date(
+    hoy.getFullYear(),
+    ingreso.getMonth(),
+    ingreso.getDate()
+  );
+
+  if (hoy < aniversarioEsteAnio) {
+    anios--;
+  }
+
+  if (anios < 1) return 0;
+  if (anios === 1) return 12;
+  if (anios === 2) return 14;
+  if (anios === 3) return 16;
+  if (anios === 4) return 18;
+  if (anios === 5) return 20;
+  if (anios <= 10) return 22;
+  if (anios <= 15) return 24;
+  if (anios <= 20) return 26;
+  if (anios <= 25) return 28;
+  if (anios <= 30) return 30;
+  return 32;
+}
+
+
+// ===========================================
+// ENPOINT PARA RENOVACIÓN DE DÍAS ACUMULADOS
+// ===========================================
+router.post("/vacaciones/renovar", async (req, res) => {
+  const hoy = new Date();
+  const mesExpiracion = new Date();
+  mesExpiracion.setMonth(hoy.getMonth() + 2);
+
+  try {
+    const [empleados] = await db.query(`
+      SELECT *
+      FROM empleados
+      WHERE fecha_ingreso IS NOT NULL
+    `);
+
+    for (const emp of empleados) {
+      const ingreso = new Date(emp.fecha_ingreso);
+
+      const aniversario = new Date(
+        hoy.getFullYear(),
+        ingreso.getMonth(),
+        ingreso.getDate()
+      );
+
+      if (hoy < aniversario) continue;
+
+      if (
+        emp.ultimo_aniversario &&
+        new Date(emp.ultimo_aniversario).getFullYear() === hoy.getFullYear()
+      ) {
+        continue;
+      }
+
+      const diasBase = calcularDiasBasePorAntiguedad(emp.fecha_ingreso);
+
+      const sobrantes = emp.dias_vacaciones || 0;
+
+      await db.query(
+        `
+        UPDATE empleados SET
+          dias_acumulados = ?,
+          dias_base = ?,
+          dias_vacaciones = ?,
+          ultimo_aniversario = ?,
+          fecha_expiracion = ?
+        WHERE id = ?
+        `,
+        [
+          sobrantes,
+          diasBase,
+          diasBase + sobrantes,
+          hoy,
+          mesExpiracion,
+          emp.id,
+        ]
+      );
+    }
+
+    res.json({ message: "Renovación de vacaciones completada" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error en renovación de vacaciones" });
+  }
+});
+
