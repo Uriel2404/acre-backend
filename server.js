@@ -855,7 +855,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       const [empRows] = await db.promise().query(
-        "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
+        "SELECT nombre, dias_base, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
 
@@ -864,7 +864,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       const empleado = empRows[0];
-      const disponibles = empleado.dias_base + empleado.dias_acumulados;
+      const disponibles = empleado.dias_base;
       const jefe_id = empleado.jefe_id;
 
       if (!jefe_id) {
