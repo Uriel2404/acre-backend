@@ -1265,7 +1265,7 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 1) Obtener solicitud + empleado
     const [rows] = await conn.query(
       `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
-        e.nombre, e.correo, e.dias_base, e.dias_acumulados, e.fecha_expiracion
+        e.nombre, e.correo
       FROM vacaciones v
       JOIN empleados e ON v.empleado_id = e.id
       WHERE v.id = ? FOR UPDATE`,
@@ -1296,22 +1296,6 @@ app.put("/vacaciones/:id", async (req, res) => {
     const msPorDia = 1000 * 60 * 60 * 24;
     const diasSolicitados = Math.ceil((fin - inicio) / msPorDia) + 1;
 
-    // Calcular días disponibles (REALES)
-    const hoy = new Date();
-    let diasAcumuladosValidos = solicitud.dias_acumulados;
-
-    // Si ya expiraron, no cuentan
-    if (
-      solicitud.fecha_expiracion &&
-      new Date(solicitud.fecha_expiracion) < hoy
-    ) {
-      diasAcumuladosValidos = 0;
-    }
-
-    const diasDisponibles =
-      solicitud.dias_base + diasAcumuladosValidos;
-
-
     // Si apruebas, validar días disponibles
     if (estado === "Aprobada") {
 
@@ -1324,22 +1308,6 @@ app.put("/vacaciones/:id", async (req, res) => {
       }
 
     }
-
-    // Paso Extra Limpiar acumulados expirados en BD
-    if (
-      solicitud.fecha_expiracion &&
-      new Date(solicitud.fecha_expiracion) < hoy &&
-      solicitud.dias_acumulados > 0
-    ) {
-      await conn.query(
-        `UPDATE empleados
-        SET dias_acumulados = 0,
-            fecha_expiracion = NULL
-        WHERE id = ?`,
-        [solicitud.empleado_id]
-      );
-    }
-
 
     // 2) Actualizar estado de la solicitud
     await conn.query(
@@ -1354,29 +1322,13 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 3) Si fue aprobada -> restar dias en empleados
     if (estado === "Aprobada") {
       let restantes = diasSolicitados;
-      let nuevosAcumulados = diasAcumuladosValidos;
-      let nuevosBase = solicitud.dias_base;
-
-      // 1️⃣ Usar acumulados primero (si siguen vigentes)
-      if (
-        solicitud.fecha_expiracion &&
-        new Date(solicitud.fecha_expiracion) >= hoy
-      ) {
-        const usados = Math.min(restantes, nuevosAcumulados);
-        nuevosAcumulados -= usados;
-        restantes -= usados;
-      }
-
-      // 2️⃣ Usar días base
-      if (restantes > 0) {
-        nuevosBase -= restantes;
-      }
-
       await conn.query(
-        `UPDATE empleados
-        SET dias_base = ?, dias_acumulados = ?
-        WHERE id = ?`,
-        [nuevosBase, nuevosAcumulados, solicitud.empleado_id]
+        `
+        UPDATE empleados
+        SET dias_vacaciones = dias_vacaciones - ?
+        WHERE id = ?
+        `,
+        [restantes, solicitud.empleado_id]
       );
     }
 
