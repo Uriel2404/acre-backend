@@ -1265,13 +1265,12 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 1) Obtener solicitud + empleado
     const [rows] = await conn.query(
       `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
-        e.nombre, e.correo
-      FROM vacaciones v
-      JOIN empleados e ON v.empleado_id = e.id
-      WHERE v.id = ? FOR UPDATE`,
+       e.nombre, e.correo, e.dias_vacaciones
+       FROM vacaciones v
+       JOIN empleados e ON v.empleado_id = e.id
+       WHERE v.id = ? FOR UPDATE`,
       [id]
     );
-
 
     if (!rows.length) {
       await conn.rollback();
@@ -1298,15 +1297,16 @@ app.put("/vacaciones/:id", async (req, res) => {
 
     // Si apruebas, validar días disponibles
     if (estado === "Aprobada") {
-
-      if (diasSolicitados > diasDisponibles) {
+      if (solicitud.dias_vacaciones == null) {
         await conn.rollback();
         conn.release();
-        return res.status(400).json({
-          error: "El empleado no tiene suficientes días disponibles"
-        });
+        return res.status(400).json({ error: "Empleado no tiene dias_vacaciones configurados" });
       }
-
+      if (diasSolicitados > solicitud.dias_vacaciones) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ error: "El empleado no tiene suficientes días disponibles" });
+      }
     }
 
     // 2) Actualizar estado de la solicitud
@@ -1321,16 +1321,13 @@ app.put("/vacaciones/:id", async (req, res) => {
 
     // 3) Si fue aprobada -> restar dias en empleados
     if (estado === "Aprobada") {
-      let restantes = diasSolicitados;
       await conn.query(
-        `
-        UPDATE empleados
-        SET dias_vacaciones = dias_vacaciones - ?
-        WHERE id = ?
-        `,
-        [restantes, solicitud.empleado_id]
+        "UPDATE empleados SET dias_vacaciones = dias_vacaciones - ? WHERE id = ?",
+        [diasSolicitados, solicitud.empleado_id]
       );
     }
+
+    await conn.commit();
 
     // ======================
     // ENVIAR CORREO A EMPLEADO
