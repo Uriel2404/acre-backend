@@ -63,6 +63,51 @@ function validarRol(permisos = []) {
     next();
   };
 }
+
+// ===============================================================
+//     SISTEMA DE RENOVACIÓN AUTOMÁTICA DE VACACIONES
+// ===============================================================
+
+// Tabla de días según años laborados
+const TABLA_VACACIONES = {
+  1: 12,
+  2: 14,
+  3: 16,
+  4: 18,
+  5: 20,
+  6: 22, 7: 22, 8: 22, 9: 22, 10: 22,
+  11: 24, 12: 24, 13: 24, 14: 24, 15: 24,
+  16: 26, 17: 26, 18: 26, 19: 26, 20: 26,
+  21: 28, 22: 28, 23: 28, 24: 28, 25: 28,
+  26: 30, 27: 30, 28: 30, 29: 30, 30: 30,
+  31: 32, 32: 32, 33: 32, 34: 32, 35: 32
+};
+
+// Función para calcular años completos entre dos fechas
+function calcularAnosLaborados(fechaIngreso) {
+  const hoy = new Date();
+  const ingreso = new Date(fechaIngreso);
+  
+  let anos = hoy.getFullYear() - ingreso.getFullYear();
+  const mesActual = hoy.getMonth();
+  const mesIngreso = ingreso.getMonth();
+  
+  // Ajustar si aún no ha cumplido años este año
+  if (mesActual < mesIngreso || 
+      (mesActual === mesIngreso && hoy.getDate() < ingreso.getDate())) {
+    anos--;
+  }
+  
+  return anos;
+}
+
+// Función para obtener días de vacaciones según años
+function obtenerDiasVacaciones(anosLaborados) {
+  if (anosLaborados < 1) return 0;
+  if (anosLaborados <= 35) return TABLA_VACACIONES[anosLaborados];
+  return 32; // Máximo para más de 35 años
+}
+
 // ======================
 //  Ruta base
 // ======================
@@ -854,7 +899,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       const [empRows] = await db.promise().query(
-        "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
+        "SELECT nombre, dias_vacaciones, dias_vacaciones_anteriores, fecha_expiracion_anteriores, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
 
@@ -863,7 +908,6 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       const empleado = empRows[0];
-      const disponibles = empleado.dias_vacaciones;
       const jefe_id = empleado.jefe_id;
 
       if (!jefe_id) {
@@ -873,17 +917,31 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
         });
       }
 
+      // Calcular días disponibles totales
+      const hoy = new Date();
+      let diasAnterioresDisponibles = 0;
+
+      if (empleado.dias_vacaciones_anteriores > 0 && empleado.fecha_expiracion_anteriores) {
+        const fechaExp = new Date(empleado.fecha_expiracion_anteriores);
+        if (hoy <= fechaExp) {
+          diasAnterioresDisponibles = empleado.dias_vacaciones_anteriores;
+        }
+      }
+
+      const diasActuales = empleado.dias_vacaciones || 0;
+      const diasTotalesDisponibles = diasActuales + diasAnterioresDisponibles;
+      
+
       const inicio = new Date(fecha_inicio);
       const fin = new Date(fecha_fin);
-      const diasSolicitados =
-        Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
+      const diasSolicitados = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
 
-      if (diasSolicitados > disponibles) {
-        return res.status(400).json({
-          error: true,
-          message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${disponibles}`
-        });
-      }
+      if (diasSolicitados > diasTotalesDisponibles) {
+      return res.status(400).json({
+        error: true,
+        message: `No puedes solicitar ${diasSolicitados} días. Disponibles: ${diasTotalesDisponibles} (${diasActuales} actuales + ${diasAnterioresDisponibles} del año anterior)`
+      });
+    }
 
       const tokenJefe = crypto.randomBytes(32).toString("hex");
       const expira = new Date(Date.now() + 1000 * 60 * 60 * 48);
@@ -1082,7 +1140,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       ok: true,
       message: "Solicitud enviada correctamente",
       id: result.insertId,
-      diasSolicitados
+      diasSolicitados,
+      diasDisponibles: diasTotalesDisponibles
     });
 
   } catch (err) {
@@ -1265,7 +1324,7 @@ app.put("/vacaciones/:id", async (req, res) => {
     // 1) Obtener solicitud + empleado
     const [rows] = await conn.query(
       `SELECT v.id, v.empleado_id, v.fecha_inicio, v.fecha_fin, v.estado as estado_actual,
-       e.nombre, e.correo, e.dias_vacaciones
+       e.nombre, e.correo, e.dias_vacaciones, e.dias_vacaciones_anteriores, e.fecha_expiracion_anteriores
        FROM vacaciones v
        JOIN empleados e ON v.empleado_id = e.id
        WHERE v.id = ? FOR UPDATE`,
@@ -1292,23 +1351,54 @@ app.put("/vacaciones/:id", async (req, res) => {
     // calcular dias solicitados (incluyendo el día final)
     const inicio = new Date(solicitud.fecha_inicio);
     const fin = new Date(solicitud.fecha_fin);
-    const msPorDia = 1000 * 60 * 60 * 24;
-    const diasSolicitados = Math.ceil((fin - inicio) / msPorDia) + 1;
+    const diasSolicitados = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
 
-    // Si apruebas, validar días disponibles
+    // Si aprueba, restar días (primero de anteriores, luego de actuales)
     if (estado === "Aprobada") {
-      if (solicitud.dias_vacaciones == null) {
-        await conn.rollback();
-        conn.release();
-        return res.status(400).json({ error: "Empleado no tiene dias_vacaciones configurados" });
-      }
-      if (diasSolicitados > solicitud.dias_vacaciones) {
-        await conn.rollback();
-        conn.release();
-        return res.status(400).json({ error: "El empleado no tiene suficientes días disponibles" });
-      }
-    }
+      const hoy = new Date();
+      let diasAnterioresDisponibles = 0;
 
+      // Verificar días anteriores disponibles
+      if (solicitud.dias_vacaciones_anteriores > 0 && solicitud.fecha_expiracion_anteriores) {
+        const fechaExp = new Date(solicitud.fecha_expiracion_anteriores);
+        if (hoy <= fechaExp) {
+          diasAnterioresDisponibles = solicitud.dias_vacaciones_anteriores;
+        }
+      }
+
+      const diasActuales = solicitud.dias_vacaciones || 0;
+      const diasTotales = diasActuales + diasAnterioresDisponibles;
+
+      if (diasSolicitados > diasTotales) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ 
+          error: `El empleado no tiene suficientes días disponibles. Disponibles: ${diasTotales}, Solicitados: ${diasSolicitados}` 
+        });
+      }
+
+      // Restar días (primero de anteriores, luego de actuales)
+      let diasPorRestar = diasSolicitados;
+      let nuevosAnteriores = diasAnterioresDisponibles;
+      let nuevosActuales = diasActuales;
+
+      if (diasPorRestar <= diasAnterioresDisponibles) {
+        // Se cubren todos con días anteriores
+        nuevosAnteriores -= diasPorRestar;
+      } else {
+        // Usar todos los anteriores y parte de los actuales
+        diasPorRestar -= diasAnterioresDisponibles;
+        nuevosAnteriores = 0;
+        nuevosActuales -= diasPorRestar;
+      }
+
+      await conn.query(`
+        UPDATE empleados 
+        SET dias_vacaciones = ?,
+            dias_vacaciones_anteriores = ?
+        WHERE id = ?
+      `, [nuevosActuales, nuevosAnteriores, solicitud.empleado_id]);
+    }
     // 2) Actualizar estado de la solicitud
     await conn.query(
       `
@@ -1508,5 +1598,113 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
   } catch (err) {
     console.error("ERROR GET /vacaciones/empleado/:id:", err);
     res.status(500).json({ error: "Error al obtener historial" });
+  }
+});
+
+// =====================================================
+// ENDPOINT: Renovar vacaciones (ejecutar con cron job)
+// =====================================================
+
+app.post("/vacaciones/renovar-automatico", async (req, res) => {
+  try {
+    console.log("🔄 Iniciando renovación automática de vacaciones...");
+
+    // Obtener todos los empleados activos
+    const [empleados] = await db.promise().query(`
+      SELECT id, nombre, fecha_ingreso, dias_vacaciones, 
+             dias_vacaciones_anteriores, fecha_expiracion_anteriores, ultima_renovacion
+      FROM empleados 
+      WHERE fecha_ingreso IS NOT NULL
+    `);
+
+    const hoy = new Date();
+    let renovados = 0;
+    let expirados = 0;
+
+    for (const emp of empleados) {
+      const fechaIngreso = new Date(emp.fecha_ingreso);
+      const ultimaRenovacion = emp.ultima_renovacion ? new Date(emp.ultima_renovacion) : fechaIngreso;
+      
+      // Calcular años laborados
+      const anosLaborados = calcularAnosLaborados(emp.fecha_ingreso);
+      
+      // Verificar si ya cumplió un año desde la última renovación
+      const mesesDesdeRenovacion = (hoy.getFullYear() - ultimaRenovacion.getFullYear()) * 12 + 
+                                    (hoy.getMonth() - ultimaRenovacion.getMonth());
+      
+      const diaCumpleAniversario = fechaIngreso.getDate();
+      const mesCumpleAniversario = fechaIngreso.getMonth();
+      
+      // Si hoy es el aniversario o ya pasó y no se ha renovado este año
+      const debeRenovar = (
+        anosLaborados > 0 &&
+        hoy.getMonth() === mesCumpleAniversario &&
+        hoy.getDate() === diaCumpleAniversario &&
+        mesesDesdeRenovacion >= 12
+      );
+
+      if (debeRenovar) {
+        // Calcular días no usados del período anterior
+        const diasNoUsados = emp.dias_vacaciones || 0;
+        
+        // Obtener nuevos días según años laborados
+        const nuevosDias = obtenerDiasVacaciones(anosLaborados);
+        
+        // Fecha de expiración: 4 meses desde hoy
+        const fechaExpiracion = new Date(hoy);
+        fechaExpiracion.setMonth(fechaExpiracion.getMonth() + 4);
+        
+        // Actualizar empleado
+        await db.promise().query(`
+          UPDATE empleados 
+          SET dias_vacaciones = ?,
+              dias_vacaciones_anteriores = ?,
+              fecha_expiracion_anteriores = ?,
+              ultima_renovacion = ?
+          WHERE id = ?
+        `, [
+          nuevosDias,
+          diasNoUsados,
+          fechaExpiracion.toISOString().split('T')[0],
+          hoy.toISOString().split('T')[0],
+          emp.id
+        ]);
+
+        console.log(`✅ ${emp.nombre}: ${nuevosDias} días nuevos + ${diasNoUsados} días anteriores (expiran: ${fechaExpiracion.toISOString().split('T')[0]})`);
+        renovados++;
+      }
+
+      // Verificar si hay días anteriores expirados
+      if (emp.dias_vacaciones_anteriores > 0 && emp.fecha_expiracion_anteriores) {
+        const fechaExp = new Date(emp.fecha_expiracion_anteriores);
+        
+        if (hoy > fechaExp) {
+          // Expirar días anteriores
+          await db.promise().query(`
+            UPDATE empleados 
+            SET dias_vacaciones_anteriores = 0,
+                fecha_expiracion_anteriores = NULL
+            WHERE id = ?
+          `, [emp.id]);
+
+          console.log(`⏰ ${emp.nombre}: ${emp.dias_vacaciones_anteriores} días anteriores EXPIRADOS`);
+          expirados++;
+        }
+      }
+    }
+
+    console.log(`✅ Renovación completada: ${renovados} empleados renovados, ${expirados} expiraciones`);
+    
+    res.json({
+      ok: true,
+      message: "Renovación automática completada",
+      renovados,
+      expirados,
+      total_empleados: empleados.length
+    });
+
+  } catch (err) {
+    console.error("❌ Error en renovación automática:", err);
+    res.status(500).json({ error: "Error en renovación automática" });
   }
 });
