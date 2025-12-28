@@ -1469,8 +1469,10 @@ app.put("/vacaciones/:id", async (req, res) => {
       [id]
     );
 
+
     const solicitud = rows[0];
 
+    
     if (solicitud.estado_actual !== "Pendiente RH") {
       await conn.rollback();
       return res.status(400).json({
