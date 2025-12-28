@@ -980,11 +980,14 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
   app.post("/vacaciones", async (req, res) => {
     const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
-    await crearPeriodoVacacionesSiCorresponde(empleado_id, db);
-
     try {
+
+      await crearPeriodoVacacionesSiCorresponde(empleado_id, db);
+      
+      const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, db);
+
       const [empRows] = await db.promise().query(
-        "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
+        "SELECT nombre, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
 
@@ -993,7 +996,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       }
 
       const empleado = empRows[0];
-      const disponibles = empleado.dias_vacaciones;
+      //const disponibles = empleado.dias_vacaciones;
       const jefe_id = empleado.jefe_id;
 
       if (!jefe_id) {
@@ -1008,10 +1011,10 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
       const diasSolicitados =
         Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
 
-      if (diasSolicitados > disponibles) {
+      if (diasSolicitados > totalDisponibles) {
         return res.status(400).json({
           error: true,
-          message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${disponibles}`
+          message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${totalDisponibles}`
         });
       }
 
