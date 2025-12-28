@@ -1472,7 +1472,7 @@ app.put("/vacaciones/:id", async (req, res) => {
 
     const solicitud = rows[0];
 
-    
+
     if (solicitud.estado_actual !== "Pendiente RH") {
       await conn.rollback();
       return res.status(400).json({
@@ -1711,5 +1711,32 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
   } catch (err) {
     console.error("ERROR GET /vacaciones/empleado/:id:", err);
     res.status(500).json({ error: "Error al obtener historial" });
+  }
+});
+
+// ==================================================
+// SINCRONIZAR VACACIONES AL ENTRAR A LA PANTALLA
+// ==================================================
+app.get("/vacaciones/sync/:empleadoId", async (req, res) => {
+  const { empleadoId } = req.params;
+  const conn = await db.promise().getConnection();
+
+  try {
+    // 1️⃣ Crear periodos si faltan
+    await crearPeriodoVacacionesSiCorresponde(empleadoId, conn);
+
+    // 2️⃣ Obtener días reales
+    const { totalDisponibles } = await obtenerDiasDisponibles(empleadoId, conn);
+
+    res.json({
+      ok: true,
+      dias_disponibles: totalDisponibles
+    });
+
+  } catch (err) {
+    console.error("ERROR sync vacaciones:", err);
+    res.status(500).json({ error: "Error sincronizando vacaciones" });
+  } finally {
+    conn.release();
   }
 });
