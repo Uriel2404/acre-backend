@@ -955,6 +955,8 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
   app.post("/vacaciones", async (req, res) => {
     const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
+    await crearPeriodoVacacionesSiCorresponde(empleado_id, db);
+
     try {
       const [empRows] = await db.promise().query(
         "SELECT nombre, dias_vacaciones, jefe_id FROM empleados WHERE id = ?",
@@ -1613,8 +1615,3 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener historial" });
   }
 });
-
-
-// =============================
-// VER SOLICITUDES POR EMPLEADO
-// =============================
