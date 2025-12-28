@@ -169,6 +169,31 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, db) {
   );
 }
 
+async function obtenerDiasDisponibles(empleadoId, db) {
+  const [rows] = await db.promise().query(
+    `
+    SELECT 
+      id,
+      dias_asignados,
+      dias_usados
+    FROM vacaciones_periodos
+    WHERE empleado_id = ?
+      AND (fecha_expiracion IS NULL OR fecha_expiracion >= CURDATE())
+    `,
+    [empleadoId]
+  );
+
+  let totalDisponibles = 0;
+
+  rows.forEach(p => {
+    totalDisponibles += (p.dias_asignados - p.dias_usados);
+  });
+
+  return {
+    totalDisponibles,
+    periodos: rows
+  };
+}
 
 
 
