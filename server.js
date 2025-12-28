@@ -111,18 +111,18 @@ function diasPorAnios(anios) {
 }
 
 async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
-  const [Rows] = await conn.query(
+  const [empRows] = await conn.query(
     "SELECT id, fecha_ingreso FROM empleados WHERE id = ?",
     [empleadoId]
   );
 
-  if (!Rows.length || !Rows[0].fecha_ingreso) return;
+  if (!empRows.length || !empRows[0].fecha_ingreso) return;
 
   const empleado = empRows[0];
   const anios = calcularAniosLaborados(empleado.fecha_ingreso);
   if (anios <= 0) return;
 
-  const [existePeriodo] = await db.promise().query(
+  const [existePeriodo] = await conn.query(
     `SELECT id FROM vacaciones_periodos
      WHERE empleado_id = ? AND anio_laborado = ?`,
     [empleado.id, anios]
@@ -133,7 +133,7 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
   const anioAnterior = anios - 1;
 
   if (anioAnterior > 0) {
-    await db.promise().query(
+    await conn.query(
       `
       UPDATE vacaciones_periodos
       SET fecha_expiracion = DATE_ADD(fecha_inicio, INTERVAL 4 MONTH)
@@ -155,7 +155,7 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
     ingreso.getDate()
   );
 
-  await db.promise().query(
+  await conn.query(
     `
     INSERT INTO vacaciones_periodos
     (empleado_id, anio_laborado, dias_asignados, fecha_inicio)
@@ -222,7 +222,7 @@ async function descontarDiasVacaciones(empleadoId, diasSolicitados, conn) {
 
     const usar = Math.min(disponibles, diasRestantes);
 
-    await db.promise().query(
+    await conn.query(
       `
       UPDATE vacaciones_periodos
       SET dias_usados = dias_usados + ?
@@ -238,8 +238,6 @@ async function descontarDiasVacaciones(empleadoId, diasSolicitados, conn) {
     throw new Error("No se pudieron descontar todos los días solicitados");
   }
 }
-
-
 
 // ======================
 //  LOGIN CON EMPLEADO
@@ -1026,11 +1024,11 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       // 1️⃣ Sincronizar periodos
-      await crearPeriodoVacacionesSiCorresponde(empleado_id, conn);
+      await crearPeriodoVacacionesSiCorresponde(empleado_id, db.promise());
       // 2️⃣ Calcular días reales
-      const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, conn);
+      const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, db.promise());
 
-      const [empRows] = await conn.query(
+      const [empRows] = await db.promise().query(
         "SELECT nombre, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
@@ -1427,7 +1425,7 @@ app.get("/vacaciones", async (req, res) => {
     const diasPorEmpleado = {};
 
     for (const empId of empleadosUnicos) {
-      const { totalDisponibles } = await obtenerDiasDisponibles(empId, conn);
+      const { totalDisponibles } = await obtenerDiasDisponibles(empId, db.promise());
       diasPorEmpleado[empId] = totalDisponibles;
     }
 
@@ -1702,9 +1700,9 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
       ORDER BY v.id DESC
     `;
 
-    const [rows] = await conn.query(sql, [id]);
+    const [rows] = await db.promise().query(sql, [id]);
 
-    const { totalDisponibles } = await obtenerDiasDisponibles(id, conn);
+    const { totalDisponibles } = await obtenerDiasDisponibles(id, db.promise());
 
     res.json({dias_disponibles: totalDisponibles, solicitudes: rows});
 
