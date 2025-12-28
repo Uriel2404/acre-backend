@@ -69,6 +69,109 @@ function validarRol(permisos = []) {
 app.get("/", (req, res) => {
   res.send("API Funcionando ✅");
 });
+
+
+
+// ===============================================================
+//      L O G I C A   D E   V A C A C I O N E S   (UTILS)
+// ===============================================================
+
+function calcularAniosLaborados(fechaIngreso) {
+  const ingreso = new Date(fechaIngreso);
+  const hoy = new Date();
+
+  let anios = hoy.getFullYear() - ingreso.getFullYear();
+
+  const aniversario = new Date(
+    hoy.getFullYear(),
+    ingreso.getMonth(),
+    ingreso.getDate()
+  );
+
+  if (hoy < aniversario) {
+    anios--;
+  }
+
+  return anios;
+}
+
+function diasPorAnios(anios) {
+  if (anios === 1) return 12;
+  if (anios === 2) return 14;
+  if (anios === 3) return 16;
+  if (anios === 4) return 18;
+  if (anios === 5) return 20;
+  if (anios >= 6 && anios <= 10) return 22;
+  if (anios >= 11 && anios <= 15) return 24;
+  if (anios >= 16 && anios <= 20) return 26;
+  if (anios >= 21 && anios <= 25) return 28;
+  if (anios >= 26 && anios <= 30) return 30;
+  if (anios >= 31) return 32;
+  return 0;
+}
+
+async function crearPeriodoVacacionesSiCorresponde(empleadoId, db) {
+  const [empRows] = await db.promise().query(
+    "SELECT id, fecha_ingreso FROM empleados WHERE id = ?",
+    [empleadoId]
+  );
+
+  if (!empRows.length || !empRows[0].fecha_ingreso) return;
+
+  const empleado = empRows[0];
+  const anios = calcularAniosLaborados(empleado.fecha_ingreso);
+  if (anios <= 0) return;
+
+  const [existePeriodo] = await db.promise().query(
+    `SELECT id FROM vacaciones_periodos
+     WHERE empleado_id = ? AND anio_laborado = ?`,
+    [empleado.id, anios]
+  );
+
+  if (existePeriodo.length) return;
+
+  const anioAnterior = anios - 1;
+
+  if (anioAnterior > 0) {
+    await db.promise().query(
+      `
+      UPDATE vacaciones_periodos
+      SET fecha_expiracion = DATE_ADD(fecha_inicio, INTERVAL 4 MONTH)
+      WHERE empleado_id = ?
+        AND anio_laborado = ?
+        AND dias_usados < dias_asignados
+        AND fecha_expiracion IS NULL
+      `,
+      [empleado.id, anioAnterior]
+    );
+  }
+
+  const diasAsignados = diasPorAnios(anios);
+
+  const ingreso = new Date(empleado.fecha_ingreso);
+  const fechaInicio = new Date(
+    new Date().getFullYear(),
+    ingreso.getMonth(),
+    ingreso.getDate()
+  );
+
+  await db.promise().query(
+    `
+    INSERT INTO vacaciones_periodos
+    (empleado_id, anio_laborado, dias_asignados, fecha_inicio)
+    VALUES (?, ?, ?, ?)
+    `,
+    [empleado.id, anios, diasAsignados, fechaInicio]
+  );
+
+  console.log(
+    `🟢 Periodo vacaciones creado | empleado ${empleado.id} | año ${anios}`
+  );
+}
+
+
+
+
 // ======================
 //  LOGIN CON EMPLEADO
 // ======================
@@ -1510,3 +1613,8 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
     res.status(500).json({ error: "Error al obtener historial" });
   }
 });
+
+
+// =============================
+// VER SOLICITUDES POR EMPLEADO
+// =============================
