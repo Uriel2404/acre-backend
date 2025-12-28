@@ -195,6 +195,50 @@ async function obtenerDiasDisponibles(empleadoId, db) {
   };
 }
 
+async function descontarDiasVacaciones(empleadoId, diasSolicitados, db) {
+  // Obtener periodos activos ordenados:
+  // 1) con expiración más cercana
+  // 2) luego los sin expiración
+  const [periodos] = await db.promise().query(
+    `
+    SELECT id, dias_asignados, dias_usados
+    FROM vacaciones_periodos
+    WHERE empleado_id = ?
+      AND (fecha_expiracion IS NULL OR fecha_expiracion >= CURDATE())
+    ORDER BY
+      CASE WHEN fecha_expiracion IS NULL THEN 1 ELSE 0 END,
+      fecha_expiracion ASC
+    `,
+    [empleadoId]
+  );
+
+  let diasRestantes = diasSolicitados;
+
+  for (const periodo of periodos) {
+    if (diasRestantes <= 0) break;
+
+    const disponibles = periodo.dias_asignados - periodo.dias_usados;
+    if (disponibles <= 0) continue;
+
+    const usar = Math.min(disponibles, diasRestantes);
+
+    await db.promise().query(
+      `
+      UPDATE vacaciones_periodos
+      SET dias_usados = dias_usados + ?
+      WHERE id = ?
+      `,
+      [usar, periodo.id]
+    );
+
+    diasRestantes -= usar;
+  }
+
+  if (diasRestantes > 0) {
+    throw new Error("No se pudieron descontar todos los días solicitados");
+  }
+}
+
 
 
 // ======================
@@ -981,9 +1025,9 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
     const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
 
     try {
-
+      // 1️⃣ Sincronizar periodos
       await crearPeriodoVacacionesSiCorresponde(empleado_id, db);
-      
+      // 2️⃣ Calcular días reales
       const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, db);
 
       const [empRows] = await db.promise().query(
@@ -1008,19 +1052,21 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
       const inicio = new Date(fecha_inicio);
       const fin = new Date(fecha_fin);
-      const diasSolicitados =
-        Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
-
+      const diasSolicitados = Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)) + 1;
+      // 3️⃣ Validar
       if (diasSolicitados > totalDisponibles) {
         return res.status(400).json({
           error: true,
           message: `No puedes solicitar ${diasSolicitados} días, solo tienes ${totalDisponibles}`
         });
       }
+      // 4️⃣ Descontar días de vacaciones por periodo
+      await descontarDiasVacaciones(empleado_id, diasSolicitados, db);
+
 
       const tokenJefe = crypto.randomBytes(32).toString("hex");
       const expira = new Date(Date.now() + 1000 * 60 * 60 * 48);
-
+      // 5️⃣ Crear la solicitud
       const [result] = await db.promise().query(
         `
         INSERT INTO vacaciones
