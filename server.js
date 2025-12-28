@@ -110,13 +110,13 @@ function diasPorAnios(anios) {
   return 0;
 }
 
-async function crearPeriodoVacacionesSiCorresponde(empleadoId, db) {
-  const [empRows] = await db.promise().query(
+async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
+  const [Rows] = await conn.query(
     "SELECT id, fecha_ingreso FROM empleados WHERE id = ?",
     [empleadoId]
   );
 
-  if (!empRows.length || !empRows[0].fecha_ingreso) return;
+  if (!Rows.length || !Rows[0].fecha_ingreso) return;
 
   const empleado = empRows[0];
   const anios = calcularAniosLaborados(empleado.fecha_ingreso);
@@ -169,8 +169,8 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, db) {
   );
 }
 
-async function obtenerDiasDisponibles(empleadoId, db) {
-  const [rows] = await db.promise().query(
+async function obtenerDiasDisponibles(empleadoId, conn) {
+  const [rows] = await conn.query(
     `
     SELECT 
       id,
@@ -195,11 +195,11 @@ async function obtenerDiasDisponibles(empleadoId, db) {
   };
 }
 
-async function descontarDiasVacaciones(empleadoId, diasSolicitados, db) {
+async function descontarDiasVacaciones(empleadoId, diasSolicitados, conn) {
   // Obtener periodos activos ordenados:
   // 1) con expiración más cercana
   // 2) luego los sin expiración
-  const [periodos] = await db.promise().query(
+  const [periodos] = await conn.query(
     `
     SELECT id, dias_asignados, dias_usados
     FROM vacaciones_periodos
@@ -1026,11 +1026,11 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
     try {
       // 1️⃣ Sincronizar periodos
-      await crearPeriodoVacacionesSiCorresponde(empleado_id, db);
+      await crearPeriodoVacacionesSiCorresponde(empleado_id, conn);
       // 2️⃣ Calcular días reales
-      const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, db);
+      const {totalDisponibles, periodos} = await obtenerDiasDisponibles(empleado_id, conn);
 
-      const [empRows] = await db.promise().query(
+      const [empRows] = await conn.query(
         "SELECT nombre, jefe_id FROM empleados WHERE id = ?",
         [empleado_id]
       );
@@ -1427,7 +1427,7 @@ app.get("/vacaciones", async (req, res) => {
     const diasPorEmpleado = {};
 
     for (const empId of empleadosUnicos) {
-      const { totalDisponibles } = await obtenerDiasDisponibles(empId, db);
+      const { totalDisponibles } = await obtenerDiasDisponibles(empId, conn);
       diasPorEmpleado[empId] = totalDisponibles;
     }
 
@@ -1702,9 +1702,9 @@ app.get("/vacaciones/empleado/:id", async (req, res) => {
       ORDER BY v.id DESC
     `;
 
-    const [rows] = await db.promise().query(sql, [id]);
+    const [rows] = await conn.query(sql, [id]);
 
-    const { totalDisponibles } = await obtenerDiasDisponibles(id, db);
+    const { totalDisponibles } = await obtenerDiasDisponibles(id, conn);
 
     res.json({dias_disponibles: totalDisponibles, solicitudes: rows});
 
