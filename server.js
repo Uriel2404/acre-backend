@@ -1977,3 +1977,37 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
   }
 });
 
+// =====================================
+// CALENDARIO RH - VACACIONES APROBADAS
+// =====================================
+app.get("/calendario/vacaciones", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT
+        v.id,
+        v.fecha_inicio,
+        v.fecha_fin,
+        e.nombre,
+        e.departamento
+      FROM vacaciones v
+      INNER JOIN empleados e ON v.empleado_id = e.id
+      WHERE v.estado = 'Aprobada'
+    `);
+
+    const eventos = rows.map(v => ({
+      id: v.id,
+      title: v.nombre + " - Vacaciones",
+      start: v.fecha_inicio,
+      end: v.fecha_fin,
+      extendedProps: {
+        departamento: v.departamento
+      }
+    }));
+
+    res.json(eventos);
+
+  } catch (err) {
+    console.error("ERROR calendario vacaciones:", err);
+    res.status(500).json({ error: "Error cargando calendario" });
+  }
+});
