@@ -1940,6 +1940,16 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
     sheet.getRow(1).font = { bold: true };
 
     const buffer = await workbook.xlsx.writeBuffer();
+    
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=vacaciones_empleados.xlsx"
+    );
 
     res.send(Buffer.from(buffer));
 
