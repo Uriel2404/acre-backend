@@ -125,7 +125,7 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
 
   if (antiguedad <= 0) return;
 
-  // 🔁 CREAR TODOS LOS PERIODOS FALTANTES
+  // 🔁 Crear TODOS los periodos faltantes
   for (let anio = 1; anio <= antiguedad; anio++) {
 
     const [existe] = await conn.query(
@@ -138,12 +138,8 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
 
     const diasAsignados = diasPorAnios(anio);
 
-    // 📅 Fecha inicio del periodo = aniversario de ese año
-    const fechaInicio = new Date(
-      fechaIngreso.getFullYear() + anio,
-      fechaIngreso.getMonth(),
-      fechaIngreso.getDate()
-    );
+    // ✅ Fecha inicio correcta del periodo
+    const fechaInicio = obtenerFechaInicioPeriodo(fechaIngreso, anio);
 
     await conn.query(
       `
@@ -154,24 +150,33 @@ async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
       [empleadoId, anio, diasAsignados, fechaInicio]
     );
 
-    // ⏳ EXPIRAR EL AÑO ANTERIOR (SI APLICA)
+    // ⏳ Expirar el año anterior (si existe)
     if (anio > 1) {
+      const fechaInicioPeriodoActual =
+        obtenerFechaInicioPeriodo(fechaIngreso, anio);
+
+      const fechaExpiracionAnterior = new Date(fechaInicioPeriodoActual);
+      fechaExpiracionAnterior.setMonth(
+        fechaExpiracionAnterior.getMonth() + 4
+      );
+
       await conn.query(
         `
         UPDATE vacaciones_periodos
-        SET fecha_expiracion = DATE_ADD(fecha_inicio, INTERVAL 4 MONTH)
+        SET fecha_expiracion = ?
         WHERE empleado_id = ?
           AND anio_laborado = ?
           AND dias_usados < dias_asignados
           AND fecha_expiracion IS NULL
         `,
-        [empleadoId, anio - 1]
+        [fechaExpiracionAnterior, empleadoId, anio - 1]
       );
     }
 
     console.log(`🟢 Periodo creado: empleado ${empleadoId}, año ${anio}`);
   }
 }
+
 
 
 async function obtenerDiasDisponibles(empleadoId, conn) {
@@ -271,6 +276,14 @@ function obtenerUltimoAniversario(fechaIngreso) {
   if (aniversario > hoy) year--;
 
   return new Date(year, ingreso.getMonth(), ingreso.getDate());
+}
+
+function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
+  const ingreso = new Date(fechaIngreso);
+  const fecha = new Date(ingreso);
+
+  fecha.setFullYear(ingreso.getFullYear() + anioLaborado - 1);
+  return fecha;
 }
 
 
