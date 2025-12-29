@@ -287,71 +287,6 @@ function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
 }
 
 
-async function repararPeriodosEmpleado(empleadoId, fechaIngreso, conn) {
-  const ingreso = new Date(fechaIngreso);
-  const antiguedad = calcularAntiguedad(ingreso);
-
-  if (antiguedad <= 0) return;
-
-  for (let anio = 1; anio <= antiguedad; anio++) {
-
-    const fechaInicio = obtenerFechaInicioPeriodo(ingreso, anio);
-    const diasAsignados = diasPorAnios(anio);
-
-    const [rows] = await conn.query(
-      `
-      SELECT id, dias_usados
-      FROM vacaciones_periodos
-      WHERE empleado_id = ? AND anio_laborado = ?
-      `,
-      [empleadoId, anio]
-    );
-
-    // ➕ Crear periodo si no existe
-    if (!rows.length) {
-      await conn.query(
-        `
-        INSERT INTO vacaciones_periodos
-        (empleado_id, anio_laborado, dias_asignados, dias_usados, fecha_inicio)
-        VALUES (?, ?, ?, 0, ?)
-        `,
-        [empleadoId, anio, diasAsignados, fechaInicio]
-      );
-    } else {
-      // 🔁 Asegurar días correctos
-      await conn.query(
-        `
-        UPDATE vacaciones_periodos
-        SET dias_asignados = ?
-        WHERE id = ?
-        `,
-        [diasAsignados, rows[0].id]
-      );
-    }
-
-    // ⏳ Expirar año anterior correctamente
-    if (anio > 1) {
-      const fechaExpiracion = new Date(fechaInicio);
-      fechaExpiracion.setMonth(fechaExpiracion.getMonth() + 4);
-
-      await conn.query(
-        `
-        UPDATE vacaciones_periodos
-        SET fecha_expiracion = ?
-        WHERE empleado_id = ?
-          AND anio_laborado = ?
-          AND dias_usados < dias_asignados
-          AND fecha_expiracion IS NULL
-        `,
-        [fechaExpiracion, empleadoId, anio - 1]
-      );
-    }
-  }
-
-  console.log(`🔧 Periodos reparados: empleado ${empleadoId}`);
-}
-
-
 // ======================
 //  LOGIN CON EMPLEADO
 // ======================
@@ -2037,37 +1972,6 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
   } catch (err) {
     console.error("ERROR Excel RH:", err);
     res.status(500).json({ error: "Error generando Excel" });
-  } finally {
-    conn.release();
-  }
-});
-
-
-// ==================================================
-// 🔧 SCRIPT DE CORRECCIÓN DE PERIODOS EXISTENTES
-// ==================================================
-app.post("/admin/vacaciones/reparar-periodos", async (req, res) => {
-  const conn = await db.promise().getConnection();
-
-  try {
-    const [empleados] = await conn.query(`
-      SELECT id, fecha_ingreso
-      FROM empleados
-      WHERE fecha_ingreso IS NOT NULL
-    `);
-
-    for (const emp of empleados) {
-      await repararPeriodosEmpleado(emp.id, emp.fecha_ingreso, conn);
-    }
-
-    res.json({
-      ok: true,
-      message: "✅ Periodos de vacaciones reparados correctamente"
-    });
-
-  } catch (err) {
-    console.error("ERROR reparando periodos:", err);
-    res.status(500).json({ error: "Error reparando periodos" });
   } finally {
     conn.release();
   }
