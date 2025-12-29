@@ -282,7 +282,7 @@ function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
   const ingreso = new Date(fechaIngreso);
   const fecha = new Date(ingreso);
 
-  fecha.setFullYear(ingreso.getFullYear() + anioLaborado - 1);
+  fecha.setFullYear(ingreso.getFullYear() + anioLaborado);
   return fecha;
 }
 
