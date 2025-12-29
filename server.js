@@ -1871,70 +1871,100 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
 
   try {
     const [empleados] = await conn.query(`
-      SELECT id, nombre, puesto, departamento, area, fecha_ingreso
+      SELECT 
+        id,
+        nombre,
+        puesto,
+        departamento,
+        area,
+        fecha_ingreso
       FROM empleados
       ORDER BY nombre
     `);
 
-    const rows = [];
+    const rowsExcel = [];
 
     for (const emp of empleados) {
-
+      // 🔑 sincroniza SIEMPRE
       await crearPeriodoVacacionesSiCorresponde(emp.id, conn);
-      const { totalDisponibles } = await obtenerDiasDisponibles(emp.id, conn);
+
+      const antiguedad = calcularAntiguedad(emp.fecha_ingreso);
+      const ultimoAniversario = obtenerUltimoAniversario(emp.fecha_ingreso);
 
       const [periodos] = await conn.query(`
-        SELECT anio_laborado, dias_asignados, dias_usados, fecha_expiracion
+        SELECT 
+          anio_laborado,
+          dias_asignados,
+          dias_usados,
+          fecha_expiracion
         FROM vacaciones_periodos
         WHERE empleado_id = ?
-        ORDER BY anio_laborado
       `, [emp.id]);
 
-      if (periodos.length === 0) {
-        rows.push({
-          Nombre: emp.nombre,
-          Puesto: emp.puesto,
-          Departamento: emp.departamento,
-          Área: emp.area,
-          "Año laborado": "-",
-          "Días asignados": "-",
-          "Días usados": "-",
-          "Fecha expiración": "-",
-          "Días disponibles totales": totalDisponibles
-        });
-      }
+      let diasActual = 0;
+      let diasAnterior = 0;
+      const hoy = new Date();
 
       for (const p of periodos) {
-        rows.push({
-          Nombre: emp.nombre,
-          Puesto: emp.puesto,
-          Departamento: emp.departamento,
-          Área: emp.area,
-          "Año laborado": p.anio_laborado,
-          "Días asignados": p.dias_asignados,
-          "Días usados": p.dias_usados,
-          "Fecha expiración": p.fecha_expiracion || "Vigente",
-          "Días disponibles totales": totalDisponibles
-        });
+        const disponibles = p.dias_asignados - p.dias_usados;
+
+        if (p.anio_laborado === antiguedad) {
+          diasActual = disponibles;
+        }
+
+        if (
+          p.anio_laborado === antiguedad - 1 &&
+          (!p.fecha_expiracion || new Date(p.fecha_expiracion) >= hoy)
+        ) {
+          diasAnterior = disponibles;
+        }
       }
+
+      rowsExcel.push({
+        nombre: emp.nombre,
+        puesto: emp.puesto,
+        departamento: emp.departamento,
+        area: emp.area,
+        fecha_ingreso: emp.fecha_ingreso,
+        antiguedad,
+        ultimo_aniversario: ultimoAniversario.toISOString().split("T")[0],
+        dias_actual: diasActual,
+        dias_anterior: diasAnterior
+      });
     }
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "Vacaciones RH");
+    // 📘 Crear Excel
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Vacaciones RH");
 
-    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    sheet.columns = [
+      { header: "Empleado", key: "nombre", width: 30 },
+      { header: "Puesto", key: "puesto", width: 20 },
+      { header: "Departamento", key: "departamento", width: 20 },
+      { header: "Área", key: "area", width: 20 },
+      { header: "Fecha ingreso", key: "fecha_ingreso", width: 15 },
+      { header: "Antigüedad (años)", key: "antiguedad", width: 18 },
+      { header: "Último aniversario", key: "ultimo_aniversario", width: 18 },
+      { header: "Días año actual", key: "dias_actual", width: 18 },
+      { header: "Días año anterior", key: "dias_anterior", width: 22 }
+    ];
 
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=vacaciones_empleados.xlsx"
-    );
+    sheet.addRows(rowsExcel);
+
+    // 🎨 Encabezados en negrita
+    sheet.getRow(1).font = { bold: true };
+
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=vacaciones_empleados.xlsx"
+    );
 
-    res.send(buffer);
+    await workbook.xlsx.write(res);
+    res.end();
 
   } catch (err) {
     console.error("ERROR Excel RH:", err);
