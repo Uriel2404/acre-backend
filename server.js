@@ -114,62 +114,65 @@ function diasPorAnios(anios) {
 
 async function crearPeriodoVacacionesSiCorresponde(empleadoId, conn) {
   const [empRows] = await conn.query(
-    "SELECT id, fecha_ingreso FROM empleados WHERE id = ?",
+    "SELECT fecha_ingreso FROM empleados WHERE id = ?",
     [empleadoId]
   );
 
   if (!empRows.length || !empRows[0].fecha_ingreso) return;
 
-  const empleado = empRows[0];
-  const anios = calcularAniosLaborados(empleado.fecha_ingreso);
-  if (anios <= 0) return;
+  const fechaIngreso = new Date(empRows[0].fecha_ingreso);
+  const antiguedad = calcularAntiguedad(fechaIngreso);
 
-  const [existePeriodo] = await conn.query(
-    `SELECT id FROM vacaciones_periodos
-     WHERE empleado_id = ? AND anio_laborado = ?`,
-    [empleado.id, anios]
-  );
+  if (antiguedad <= 0) return;
 
-  if (existePeriodo.length) return;
+  // 🔁 CREAR TODOS LOS PERIODOS FALTANTES
+  for (let anio = 1; anio <= antiguedad; anio++) {
 
-  const anioAnterior = anios - 1;
+    const [existe] = await conn.query(
+      `SELECT id FROM vacaciones_periodos
+       WHERE empleado_id = ? AND anio_laborado = ?`,
+      [empleadoId, anio]
+    );
 
-  if (anioAnterior > 0) {
+    if (existe.length) continue;
+
+    const diasAsignados = diasPorAnios(anio);
+
+    // 📅 Fecha inicio del periodo = aniversario de ese año
+    const fechaInicio = new Date(
+      fechaIngreso.getFullYear() + anio,
+      fechaIngreso.getMonth(),
+      fechaIngreso.getDate()
+    );
+
     await conn.query(
       `
-      UPDATE vacaciones_periodos
-      SET fecha_expiracion = DATE_ADD(fecha_inicio, INTERVAL 4 MONTH)
-      WHERE empleado_id = ?
-        AND anio_laborado = ?
-        AND dias_usados < dias_asignados
-        AND fecha_expiracion IS NULL
+      INSERT INTO vacaciones_periodos
+      (empleado_id, anio_laborado, dias_asignados, dias_usados, fecha_inicio)
+      VALUES (?, ?, ?, 0, ?)
       `,
-      [empleado.id, anioAnterior]
+      [empleadoId, anio, diasAsignados, fechaInicio]
     );
+
+    // ⏳ EXPIRAR EL AÑO ANTERIOR (SI APLICA)
+    if (anio > 1) {
+      await conn.query(
+        `
+        UPDATE vacaciones_periodos
+        SET fecha_expiracion = DATE_ADD(fecha_inicio, INTERVAL 4 MONTH)
+        WHERE empleado_id = ?
+          AND anio_laborado = ?
+          AND dias_usados < dias_asignados
+          AND fecha_expiracion IS NULL
+        `,
+        [empleadoId, anio - 1]
+      );
+    }
+
+    console.log(`🟢 Periodo creado: empleado ${empleadoId}, año ${anio}`);
   }
-
-  const diasAsignados = diasPorAnios(anios);
-
-  const ingreso = new Date(empleado.fecha_ingreso);
-  const fechaInicio = new Date(
-    new Date().getFullYear(),
-    ingreso.getMonth(),
-    ingreso.getDate()
-  );
-
-  await conn.query(
-    `
-    INSERT INTO vacaciones_periodos
-    (empleado_id, anio_laborado, dias_asignados, fecha_inicio)
-    VALUES (?, ?, ?, ?)
-    `,
-    [empleado.id, anios, diasAsignados, fechaInicio]
-  );
-
-  console.log(
-    `🟢 Periodo vacaciones creado | empleado ${empleado.id} | año ${anios}`
-  );
 }
+
 
 async function obtenerDiasDisponibles(empleadoId, conn) {
   const [rows] = await conn.query(
