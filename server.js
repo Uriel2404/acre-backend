@@ -7,6 +7,7 @@ import ftp from "basic-ftp";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import XLSX from "xlsx";
 
 
 dotenv.config();
@@ -1736,6 +1737,146 @@ app.get("/vacaciones/sync/:empleadoId", async (req, res) => {
   } catch (err) {
     console.error("ERROR sync vacaciones:", err);
     res.status(500).json({ error: "Error sincronizando vacaciones" });
+  } finally {
+    conn.release();
+  }
+});
+
+// ==================================================
+// VER DATOS RH DE VACACIONES DE TODOS LOS EMPLEADOS
+// ==================================================
+app.get("/rh/vacaciones/empleados", async (req, res) => {
+  const conn = await db.promise().getConnection();
+
+  try {
+    const [empleados] = await conn.query(`
+      SELECT 
+        id,
+        nombre,
+        puesto,
+        departamento,
+        area,
+        fecha_ingreso
+      FROM empleados
+      ORDER BY nombre
+    `);
+
+    const resultado = [];
+
+    for (const emp of empleados) {
+
+      // 🔑 SINCRONIZA PERIODOS SIEMPRE
+      await crearPeriodoVacacionesSiCorresponde(emp.id, conn);
+
+      // Obtiene días disponibles
+      const { totalDisponibles } = await obtenerDiasDisponibles(emp.id, conn);
+
+      // Obtiene periodos
+      const [periodos] = await conn.query(`
+        SELECT 
+          anio_laborado,
+          dias_asignados,
+          dias_usados,
+          fecha_inicio,
+          fecha_expiracion
+        FROM vacaciones_periodos
+        WHERE empleado_id = ?
+        ORDER BY anio_laborado
+      `, [emp.id]);
+
+      resultado.push({
+        ...emp,
+        dias_disponibles: totalDisponibles,
+        periodos
+      });
+    }
+
+    res.json(resultado);
+
+  } catch (err) {
+    console.error("ERROR RH vacaciones:", err);
+    res.status(500).json({ error: "Error obteniendo datos RH" });
+  } finally {
+    conn.release();
+  }
+});
+
+// ==================================================
+// EXPORTAR EXCEL DATOS RH DE VACACIONES DE EMPLEADOS
+// ==================================================
+app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
+  const conn = await db.promise().getConnection();
+
+  try {
+    const [empleados] = await conn.query(`
+      SELECT id, nombre, puesto, departamento, area, fecha_ingreso
+      FROM empleados
+      ORDER BY nombre
+    `);
+
+    const rows = [];
+
+    for (const emp of empleados) {
+
+      await crearPeriodoVacacionesSiCorresponde(emp.id, conn);
+      const { totalDisponibles } = await obtenerDiasDisponibles(emp.id, conn);
+
+      const [periodos] = await conn.query(`
+        SELECT anio_laborado, dias_asignados, dias_usados, fecha_expiracion
+        FROM vacaciones_periodos
+        WHERE empleado_id = ?
+        ORDER BY anio_laborado
+      `, [emp.id]);
+
+      if (periodos.length === 0) {
+        rows.push({
+          Nombre: emp.nombre,
+          Puesto: emp.puesto,
+          Departamento: emp.departamento,
+          Área: emp.area,
+          "Año laborado": "-",
+          "Días asignados": "-",
+          "Días usados": "-",
+          "Fecha expiración": "-",
+          "Días disponibles totales": totalDisponibles
+        });
+      }
+
+      for (const p of periodos) {
+        rows.push({
+          Nombre: emp.nombre,
+          Puesto: emp.puesto,
+          Departamento: emp.departamento,
+          Área: emp.area,
+          "Año laborado": p.anio_laborado,
+          "Días asignados": p.dias_asignados,
+          "Días usados": p.dias_usados,
+          "Fecha expiración": p.fecha_expiracion || "Vigente",
+          "Días disponibles totales": totalDisponibles
+        });
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, "Vacaciones RH");
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=vacaciones_empleados.xlsx"
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.send(buffer);
+
+  } catch (err) {
+    console.error("ERROR Excel RH:", err);
+    res.status(500).json({ error: "Error generando Excel" });
   } finally {
     conn.release();
   }
