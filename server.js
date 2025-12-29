@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 
 dotenv.config();
@@ -1866,18 +1867,14 @@ app.get("/rh/vacaciones/empleados", async (req, res) => {
 // ==================================================
 // EXPORTAR EXCEL DATOS RH DE VACACIONES DE EMPLEADOS
 // ==================================================
+import ExcelJS from "exceljs";
+
 app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
   const conn = await db.promise().getConnection();
 
   try {
     const [empleados] = await conn.query(`
-      SELECT 
-        id,
-        nombre,
-        puesto,
-        departamento,
-        area,
-        fecha_ingreso
+      SELECT id, nombre, puesto, departamento, area, fecha_ingreso
       FROM empleados
       ORDER BY nombre
     `);
@@ -1885,18 +1882,13 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
     const rowsExcel = [];
 
     for (const emp of empleados) {
-      // 🔑 sincroniza SIEMPRE
       await crearPeriodoVacacionesSiCorresponde(emp.id, conn);
 
       const antiguedad = calcularAntiguedad(emp.fecha_ingreso);
       const ultimoAniversario = obtenerUltimoAniversario(emp.fecha_ingreso);
 
       const [periodos] = await conn.query(`
-        SELECT 
-          anio_laborado,
-          dias_asignados,
-          dias_usados,
-          fecha_expiracion
+        SELECT anio_laborado, dias_asignados, dias_usados, fecha_expiracion
         FROM vacaciones_periodos
         WHERE empleado_id = ?
       `, [emp.id]);
@@ -1908,9 +1900,7 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
       for (const p of periodos) {
         const disponibles = p.dias_asignados - p.dias_usados;
 
-        if (p.anio_laborado === antiguedad) {
-          diasActual = disponibles;
-        }
+        if (p.anio_laborado === antiguedad) diasActual = disponibles;
 
         if (
           p.anio_laborado === antiguedad - 1 &&
@@ -1933,7 +1923,6 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
       });
     }
 
-    // 📘 Crear Excel
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Vacaciones RH");
 
@@ -1950,21 +1939,11 @@ app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
     ];
 
     sheet.addRows(rowsExcel);
-
-    // 🎨 Encabezados en negrita
     sheet.getRow(1).font = { bold: true };
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=vacaciones_empleados.xlsx"
-    );
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.send(Buffer.from(buffer));
 
   } catch (err) {
     console.error("ERROR Excel RH:", err);
