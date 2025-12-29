@@ -240,6 +240,36 @@ async function descontarDiasVacaciones(empleadoId, diasSolicitados, conn) {
   }
 }
 
+function calcularAntiguedad(fechaIngreso) {
+  const ingreso = new Date(fechaIngreso);
+  const hoy = new Date();
+
+  let anios = hoy.getFullYear() - ingreso.getFullYear();
+
+  const aniversario = new Date(
+    hoy.getFullYear(),
+    ingreso.getMonth(),
+    ingreso.getDate()
+  );
+
+  if (hoy < aniversario) anios--;
+
+  return Math.max(anios, 0);
+}
+
+function obtenerUltimoAniversario(fechaIngreso) {
+  const ingreso = new Date(fechaIngreso);
+  const hoy = new Date();
+
+  let year = hoy.getFullYear();
+  const aniversario = new Date(year, ingreso.getMonth(), ingreso.getDate());
+
+  if (aniversario > hoy) year--;
+
+  return new Date(year, ingreso.getMonth(), ingreso.getDate());
+}
+
+
 // ======================
 //  LOGIN CON EMPLEADO
 // ======================
@@ -1784,11 +1814,43 @@ app.get("/rh/vacaciones/empleados", async (req, res) => {
         ORDER BY anio_laborado
       `, [emp.id]);
 
+      const hoy = new Date();
+      const antiguedad = calcularAntiguedad(emp.fecha_ingreso);
+      const ultimoAniversario = obtenerUltimoAniversario(emp.fecha_ingreso);
+
+      let diasActual = 0;
+      let diasAnterior = 0;
+
+      for (const p of periodos) {
+        const disponibles = p.dias_asignados - p.dias_usados;
+
+        // Año actual
+        if (p.anio_laborado === antiguedad) {
+          diasActual = disponibles;
+        }
+
+        // Año anterior aún vigente
+        if (
+          p.anio_laborado === antiguedad - 1 &&
+          (!p.fecha_expiracion || new Date(p.fecha_expiracion) >= hoy)
+        ) {
+          diasAnterior = disponibles;
+        }
+      }
+
       resultado.push({
-        ...emp,
-        dias_disponibles: totalDisponibles,
-        periodos
+        id: emp.id,
+        nombre: emp.nombre,
+        puesto: emp.puesto,
+        departamento: emp.departamento,
+        area: emp.area,
+        fecha_ingreso: emp.fecha_ingreso,
+        antiguedad_anios: antiguedad,
+        ultimo_aniversario: ultimoAniversario.toISOString().split("T")[0],
+        dias_disponibles_actual: diasActual,
+        dias_disponibles_anterior: diasAnterior
       });
+
     }
 
     res.json(resultado);
