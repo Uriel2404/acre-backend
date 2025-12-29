@@ -1867,8 +1867,6 @@ app.get("/rh/vacaciones/empleados", async (req, res) => {
 // ==================================================
 // EXPORTAR EXCEL DATOS RH DE VACACIONES DE EMPLEADOS
 // ==================================================
-import ExcelJS from "exceljs";
-
 app.get("/rh/vacaciones/empleados/excel", async (req, res) => {
   const conn = await db.promise().getConnection();
 
