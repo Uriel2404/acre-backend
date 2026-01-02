@@ -723,29 +723,55 @@ const uploadEmpleado = multer({
 // =================
 // CREAR EMPLEADO
 // =================
+// =================
+// CREAR EMPLEADO
+// =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
-    try {
-        const { nombre, puesto, correo, telefono, departamento, area, fecha_ingreso } = req.body;
-        if (!nombre || !puesto) {
-            return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
-        }
+  try {
+    const { nombre, puesto, correo, telefono, departamento, area, fecha_ingreso } = req.body;
 
-        const fotoNueva = req.file
-            ? `https://acre.mx/Intranet/empleados/${req.file.filename}`
-            : null;
-
-        await db.promise().query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, fotoNueva]
-        );
-
-        res.json({ success: true });
-
-    } catch (err) {
-        console.error("Error al crear empleado:", err);
-        res.status(500).json({ error: "Error al crear empleado" });
+    if (!nombre || !puesto) {
+      return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
     }
+
+    let fotoNueva = null;
+
+    if (req.file) {
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname;
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/empleados");
+      await client.uploadFrom(localPath, `/public_html/Intranet/empleados/${fileName}`);
+      client.close();
+
+      fotoNueva = `https://acre.mx/Intranet/empleados/${fileName}`;
+
+      fs.unlinkSync(localPath);
+    }
+
+    await db.promise().query(
+      `INSERT INTO empleados 
+       (nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, fotoNueva]
+    );
+
+    res.json({ success: true, foto: fotoNueva });
+
+  } catch (err) {
+    console.error("Error al crear empleado:", err);
+    res.status(500).json({ error: "Error al crear empleado" });
+  }
 });
+
 
 // =====================================
 // LISTAR EMPLEADOS
