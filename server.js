@@ -723,9 +723,6 @@ const uploadEmpleado = multer({
 // =================
 // CREAR EMPLEADO
 // =================
-// =================
-// CREAR EMPLEADO
-// =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { nombre, puesto, correo, telefono, departamento, area, fecha_ingreso } = req.body;
