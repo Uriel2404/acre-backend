@@ -735,7 +735,7 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
             : null;
 
         await db.promise().query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, fotoNueva]
         );
 
@@ -766,7 +766,7 @@ app.get("/empleados", async (req, res) => {
 app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto_actual } = req.body;
+    const { nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto_actual } = req.body;
     let fotoUrl = foto_actual || null;
     // Si sube nueva foto → subir al FTP
     if (req.file) {
@@ -788,9 +788,9 @@ app.post("/empleados/:id", uploadEmpleado.single("foto"), async (req, res) => {
     // Actualizar DB
     await db.promise().query(
       `UPDATE empleados 
-       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, fecha_ingreso=?, foto=?
+       SET nombre=?, puesto=?, correo=?, telefono=?, departamento=?, area=?, fecha_ingreso=?, foto=?
        WHERE id=?`,
-      [nombre, puesto, correo, telefono, departamento, fecha_ingreso, fotoUrl, id]
+      [nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, fotoUrl, id]
     );
     res.json({ success: true, message: "Empleado actualizado correctamente", foto: fotoUrl });
   } catch (err) {
