@@ -725,7 +725,7 @@ const uploadEmpleado = multer({
 // =================
 app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
     try {
-        const { nombre, puesto, correo, telefono, departamento, fecha_ingreso } = req.body;
+        const { nombre, puesto, correo, telefono, departamento, area, fecha_ingreso } = req.body;
         if (!nombre || !puesto) {
             return res.status(400).json({ error: "Nombre y puesto son obligatorios" });
         }
@@ -735,8 +735,8 @@ app.post("/empleados", uploadEmpleado.single("foto"), async (req, res) => {
             : null;
 
         await db.promise().query(
-            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [nombre, puesto, correo, telefono, departamento, fecha_ingreso, fotoNueva]
+            "INSERT INTO empleados (nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, foto) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [nombre, puesto, correo, telefono, departamento, area, fecha_ingreso, fotoNueva]
         );
 
         res.json({ success: true });
