@@ -2034,3 +2034,398 @@ app.get("/calendario/vacaciones", async (req, res) => {
     res.status(500).json({ error: "Error cargando calendario" });
   }
 });
+
+
+
+// =========================
+//     A U S E N T I S M O
+// =========================
+
+//=================
+// PEDIR AUSENTISMO
+//=================
+app.post("/ausentismo", async (req, res) => {
+  const { empleado_id, fecha_inicio, fecha_fin, motivo } = req.body;
+
+  if (!empleado_id || !fecha_inicio || !fecha_fin || !motivo) {
+    return res.status(400).json({ error: "Datos incompletos" });
+  }
+
+  try {
+    // 1️⃣ Obtener empleado y jefe
+    const [empRows] = await db.promise().query(
+      "SELECT nombre, jefe_id FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
+
+    if (!empRows.length) {
+      return res.status(404).json({ error: "Empleado no encontrado" });
+    }
+
+    const empleado = empRows[0];
+    const jefe_id = empleado.jefe_id;
+
+    if (!jefe_id) {
+      return res.status(400).json({
+        error: "No tienes jefe directo asignado. Contacta a RH."
+      });
+    }
+
+    // 2️⃣ Crear token de aprobación
+    const tokenJefe = crypto.randomBytes(32).toString("hex");
+    const expira = new Date(Date.now() + 1000 * 60 * 60 * 48);
+
+    // 3️⃣ Guardar solicitud
+    const [result] = await db.promise().query(
+      `
+      INSERT INTO ausentismo
+      (empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, estado, aprobado_jefe, aprobado_rh, token_jefe, token_jefe_expira)
+      VALUES (?, ?, ?, ?, ?, 'Pendiente Jefe', 0, 0, ?, ?)
+      `,
+      [empleado_id, jefe_id, fecha_inicio, fecha_fin, motivo, tokenJefe, expira]
+    );
+
+    // ==============================
+    // ENVIAR CORREO AL JEFE
+    // ==============================
+    const [jefeRows] = await db.promise().query(
+      "SELECT nombre, correo FROM empleados WHERE id = ?",
+      [jefe_id]
+    );
+
+    const jefe = jefeRows[0];
+
+    const linkAprobar = `https://acre-backend.onrender.com/ausentismo/jefe/aprobar?token=${tokenJefe}`;
+    const linkRechazar = `https://acre-backend.onrender.com/ausentismo/jefe/rechazar?token=${tokenJefe}`;
+
+    const mensajeJefe = `
+      <h3>Nueva solicitud de ausentismo</h3>
+      <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+      <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+      <p><strong>Motivo:</strong> ${motivo}</p>
+      <a href="${linkAprobar}">✅ Aprobar</a> |
+      <a href="${linkRechazar}">❌ Rechazar</a>
+    `;
+
+    await fetch("https://acre.mx/api/send-mail.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-KEY": process.env.MAIL_API_KEY
+      },
+      body: JSON.stringify({
+        to: jefe.correo,
+        subject: "Solicitud de ausentismo por aprobar",
+        message: mensajeJefe
+      })
+    });
+
+    // ==============================
+    // ENVIAR CORREO A RH
+    // ==============================
+    await fetch("https://acre.mx/api/send-mail.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-KEY": process.env.MAIL_API_KEY
+      },
+      body: JSON.stringify({
+        to: "uriel.ruiz@acre.mx",
+        subject: "Nueva solicitud de ausentismo",
+        message: `
+          <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+          <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+          <p><strong>Motivo:</strong> ${motivo}</p>
+        `
+      })
+    });
+
+    return res.json({
+      ok: true,
+      message: "Solicitud de ausentismo enviada correctamente",
+      id: result.insertId
+    });
+
+  } catch (err) {
+    console.error("ERROR AUSENTISMO:", err);
+    return res.status(500).json({ error: "Error al enviar solicitud" });
+  }
+});
+
+// =============================================
+// APROBAR AUSENTISMO POR TOKEN (JEFE)
+// =============================================
+app.get("/ausentismo/jefe/aprobar", async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).send("Token inválido");
+  }
+
+  try {
+    // 🔍 Buscar solicitud por token
+    const [rows] = await db.promise().query(
+      `
+      SELECT id, token_jefe_expira, aprobado_jefe
+      FROM ausentismo
+      WHERE token_jefe = ?
+      `,
+      [token]
+    );
+
+    if (!rows.length) {
+      return res.status(404).send("Solicitud no encontrada");
+    }
+
+    const solicitud = rows[0];
+
+    // ⏰ Token expirado
+    if (new Date(solicitud.token_jefe_expira) < new Date()) {
+      return res.status(410).send("⏰ Este enlace ya expiró");
+    }
+
+    // ✅ Ya aprobada
+    if (solicitud.aprobado_jefe === 1) {
+      return res.send("✅ Esta solicitud ya fue aprobada");
+    }
+
+    // 🟢 Aprobar y pasar a RH
+    await db.promise().query(
+      `
+      UPDATE ausentismo
+      SET aprobado_jefe = 1,
+          estado = 'Pendiente RH'
+      WHERE id = ?
+      `,
+      [solicitud.id]
+    );
+
+    return res.send(`
+      <html>
+        <body style="font-family:Arial; background:#f3f4f6; padding:40px; text-align:center;">
+          <h2 style="color:#198754;">✅ Ausentismo aprobado</h2>
+          <p>La solicitud fue aprobada correctamente y enviada a RH.</p>
+        </body>
+      </html>
+    `);
+
+  } catch (err) {
+    console.error("ERROR APROBAR AUSENTISMO:", err);
+    return res.status(500).send("Error al aprobar solicitud");
+  }
+});
+
+// =======================================
+// RECHAZAR AUSENTISMO POR TOKEN (JEFE)
+// =======================================
+app.get("/ausentismo/jefe/rechazar", async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).send("Token inválido");
+  }
+
+  try {
+    const [rows] = await db.promise().query(
+      `
+      SELECT id, token_jefe_expira
+      FROM ausentismo
+      WHERE token_jefe = ?
+      `,
+      [token]
+    );
+
+    if (!rows.length) {
+      return res.status(404).send("Solicitud no encontrada");
+    }
+
+    const solicitud = rows[0];
+
+    // ⏰ Token expirado
+    if (new Date(solicitud.token_jefe_expira) < new Date()) {
+      return res.status(410).send("⏰ Este enlace ya expiró");
+    }
+
+    // ❌ Rechazar
+    await db.promise().query(
+      `
+      UPDATE ausentismo
+      SET aprobado_jefe = 0,
+          estado = 'Rechazada'
+      WHERE id = ?
+      `,
+      [solicitud.id]
+    );
+
+    return res.send(`
+      <html>
+        <body style="font-family:Arial; background:#f3f4f6; padding:40px; text-align:center;">
+          <h2 style="color:#dc3545;">❌ Ausentismo rechazado</h2>
+          <p>La solicitud fue rechazada correctamente.</p>
+        </body>
+      </html>
+    `);
+
+  } catch (err) {
+    console.error("ERROR RECHAZAR AUSENTISMO:", err);
+    return res.status(500).send("Error al rechazar solicitud");
+  }
+});
+
+//===============================
+// VER SOLICITUDES DE AUSENTISMO
+//===============================
+// GET /ausentismo -> lista solicitudes con datos del empleado
+app.get("/ausentismo", async (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        a.id,
+        a.empleado_id,
+        a.fecha_inicio,
+        a.fecha_fin,
+        a.motivo,
+        a.estado,
+        a.fecha_solicitud,
+        e.id AS emp_id,
+        e.nombre AS nombre_empleado
+      FROM ausentismo a
+      LEFT JOIN empleados e ON a.empleado_id = e.id
+      ORDER BY a.id DESC
+    `;
+
+    const [rows] = await db.promise().query(sql);
+    res.json(rows);
+
+  } catch (err) {
+    console.error("ERROR GET /ausentismo:", err);
+    res.status(500).json({ message: "Error al obtener solicitudes de ausentismo" });
+  }
+});
+
+//===============================
+// APROBAR O RECHAZAR AUSENTISMO RH
+//===============================
+app.put("/ausentismo/:id", async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  const estadosPermitidos = ["Aprobada", "Rechazada"];
+  if (!estadosPermitidos.includes(estado)) {
+    return res.status(400).json({ error: "Estado no permitido" });
+  }
+
+  const conn = await db.promise().getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1️⃣ Obtener solicitud + empleado
+    const [rows] = await conn.query(
+      `
+      SELECT a.id, a.empleado_id, a.fecha_inicio, a.fecha_fin,
+             a.estado AS estado_actual,
+             e.nombre, e.correo
+      FROM ausentismo a
+      JOIN empleados e ON a.empleado_id = e.id
+      WHERE a.id = ? FOR UPDATE
+      `,
+      [id]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    const solicitud = rows[0];
+
+    if (solicitud.estado_actual !== "Pendiente RH") {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `La solicitud no puede ser procesada en estado: ${solicitud.estado_actual}`
+      });
+    }
+
+    // 2️⃣ Actualizar estado
+    await conn.query(
+      `
+      UPDATE ausentismo
+      SET estado = ?, aprobado_rh = ?
+      WHERE id = ?
+      `,
+      [estado, estado === "Aprobada" ? 1 : 0, id]
+    );
+
+    await conn.commit();
+
+    // ======================
+    // ENVIAR CORREO AL EMPLEADO
+    // ======================
+    try {
+      let subject = "";
+      if (estado === "Aprobada") subject = "Ausentismo aprobado";
+      if (estado === "Rechazada") subject = "Ausentismo rechazado";
+
+      if (subject) {
+        const message = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+          <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+            <tr>
+              <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+                <h2>${subject}</h2>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px; color:#333;">
+                <p>Hola <strong>${solicitud.nombre}</strong>,</p>
+
+                ${
+                  estado === "Aprobada"
+                    ? `<p>Tu solicitud de ausentismo fue <strong style="color:#127726;">APROBADA</strong>.</p>`
+                    : `<p>Tu solicitud de ausentismo fue <strong style="color:#b91c1c;">RECHAZADA</strong>.</p>`
+                }
+
+                <p><strong>Fechas:</strong> ${solicitud.fecha_inicio} al ${solicitud.fecha_fin}</p>
+
+                <p style="font-size:12px; color:#777;">
+                  Este mensaje fue enviado automáticamente por la Intranet ACRE.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        `;
+
+        await fetch("https://acre.mx/api/send-mail.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": process.env.MAIL_API_KEY
+          },
+          body: JSON.stringify({
+            to: solicitud.correo,
+            subject,
+            message
+          })
+        });
+      }
+    } catch (mailError) {
+      console.error("❌ Error enviando correo empleado:", mailError);
+    }
+
+    return res.json({
+      ok: true,
+      message: `Solicitud ${estado.toLowerCase()} correctamente`
+    });
+
+  } catch (err) {
+    await conn.rollback();
+    console.error("ERROR PUT /ausentismo/:id", err);
+    return res.status(500).json({ error: "Error procesando solicitud RH" });
+  } finally {
+    conn.release();
+  }
+});
