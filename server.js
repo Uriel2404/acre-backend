@@ -2099,13 +2099,53 @@ app.post("/ausentismo", async (req, res) => {
     const linkRechazar = `https://acre-backend.onrender.com/ausentismo/jefe/rechazar?token=${tokenJefe}`;
 
     const mensajeJefe = `
-      <h3>Nueva solicitud de ausentismo</h3>
-      <p><strong>Empleado:</strong> ${empleado.nombre}</p>
-      <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
-      <p><strong>Motivo:</strong> ${motivo}</p>
-      <a href="${linkAprobar}">✅ Aprobar</a> |
-      <a href="${linkRechazar}">❌ Rechazar</a>
+    <!DOCTYPE html>
+    <html lang="es">
+    <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+      <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+        <tr>
+          <td style="background:#0f5132; color:#ffffff; padding:20px; text-align:center;">
+            <h2>Nueva solicitud de ausentismo</h2>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px; color:#333;">
+            <p>Hola <strong>${jefe.nombre}</strong>,</p>
+            <p>${empleado.nombre} ha solicitado ausentismo.</p>
+
+            <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+
+            ${
+              motivo
+                ? `<p><strong>Motivo:</strong> ${motivo}</p>`
+                : ""
+            }
+
+            <div style="margin-top:25px; text-align:center;">
+              <a href="${linkAprobar}"
+                style="background:#198754; color:#fff; padding:12px 20px;
+                      text-decoration:none; border-radius:6px; margin-right:10px;">
+                ✅ Aprobar
+              </a>
+
+              <a href="${linkRechazar}"
+                style="background:#dc3545; color:#fff; padding:12px 20px;
+                      text-decoration:none; border-radius:6px;">
+                ❌ Rechazar
+              </a>
+            </div>
+
+            <p style="margin-top:30px; font-size:12px; color:#777;">
+              Este enlace es personal y expira en 48 horas.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
     `;
+
 
     await fetch("https://acre.mx/api/send-mail.php", {
       method: "POST",
@@ -2123,6 +2163,83 @@ app.post("/ausentismo", async (req, res) => {
     // ==============================
     // ENVIAR CORREO A RH
     // ==============================
+    const mensajeRH = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Nueva Solicitud de Ausentismo</title>
+    </head>
+
+    <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
+        <tr>
+          <td align="center">
+
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
+
+              <!-- HEADER -->
+              <tr>
+                <td style="background-color:#127726; padding:20px; text-align:center;">
+                  <h1 style="margin:0; color:#ffffff; font-size:22px;">
+                    📩 Nueva Solicitud de Ausentismo
+                  </h1>
+                </td>
+              </tr>
+
+              <!-- CONTENT -->
+              <tr>
+                <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
+
+                  <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+
+                  <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                  <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
+
+                  <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                  <p><strong>Estado:</strong></p>
+
+                  <span style="
+                    display:inline-block;
+                    padding:6px 14px;
+                    background-color:#fef3c7;
+                    color:#92400e;
+                    border-radius:20px;
+                    font-size:12px;
+                    font-weight:bold;
+                  ">
+                    PENDIENTE
+                  </span>
+
+                  <p style="margin-top:15px;">
+                    <strong>Motivo:</strong><br>
+                    ${motivo || "No especificado"}
+                  </p>
+
+                </td>
+              </tr>
+
+              <!-- FOOTER -->
+              <tr>
+                <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+                  Mensaje automático generado por la Intranet ACRE<br>
+                  No responder este correo
+                </td>
+              </tr>
+
+            </table>
+
+          </td>
+        </tr>
+      </table>
+
+    </body>
+    </html>
+    `;
+
     await fetch("https://acre.mx/api/send-mail.php", {
       method: "POST",
       headers: {
@@ -2130,15 +2247,12 @@ app.post("/ausentismo", async (req, res) => {
         "X-API-KEY": process.env.MAIL_API_KEY
       },
       body: JSON.stringify({
-        to: "uriel.ruiz@acre.mx",
+        to: "uriel.ruiz@acre.mx", // RH
         subject: "Nueva solicitud de ausentismo",
-        message: `
-          <p><strong>Empleado:</strong> ${empleado.nombre}</p>
-          <p><strong>Fechas:</strong> ${fecha_inicio} al ${fecha_fin}</p>
-          <p><strong>Motivo:</strong> ${motivo}</p>
-        `
+        message: mensajeRH
       })
     });
+
 
     return res.json({
       ok: true,
