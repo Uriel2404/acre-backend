@@ -2607,13 +2607,25 @@ app.get("/solicitudes", async (req, res) => {
     // ==============================
     // INYECTAR EN RESULTADO
     // ==============================
+    const calcularDiasSolicitados = (inicio, fin) => {
+      const fechaInicio = new Date(inicio);
+      const fechaFin = new Date(fin);
+      const msPorDia = 1000 * 60 * 60 * 24;
+      return Math.ceil((fechaFin - fechaInicio) / msPorDia) + 1;
+    };
+
     const resultado = rows.map(r => ({
-      ...r,
-      dias_disponibles:
-        r.tipo === "Vacaciones"
-          ? diasPorEmpleado[r.empleado_id] ?? 0
-          : null
+    ...r,
+    dias_solicitados: calcularDiasSolicitados(
+      r.fecha_inicio,
+      r.fecha_fin
+    ),
+    dias_disponibles:
+      r.tipo === "Vacaciones"
+      ? diasPorEmpleado[r.empleado_id] ?? 0
+      : null
     }));
+
 
     res.json(resultado);
 
