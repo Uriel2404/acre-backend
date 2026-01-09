@@ -2543,3 +2543,52 @@ app.put("/ausentismo/:id", async (req, res) => {
     conn.release();
   }
 });
+
+//===================================
+// ADMINISTRAR TODAS LAS SOLICITUDES
+//===================================
+
+app.get("/rh/solicitudes", async (req, res) => {
+  try {
+    const sql = `
+      SELECT 
+        a.id,
+        'Ausentismo' AS tipo,
+        a.empleado_id,
+        e.nombre AS nombre_empleado,
+        a.fecha_inicio,
+        a.fecha_fin,
+        a.motivo,
+        a.estado,
+        a.fecha_solicitud,
+        NULL AS dias_disponibles
+      FROM ausentismo a
+      JOIN empleados e ON a.empleado_id = e.id
+
+      UNION ALL
+
+      SELECT 
+        v.id,
+        'Vacaciones' AS tipo,
+        v.empleado_id,
+        e.nombre AS nombre_empleado,
+        v.fecha_inicio,
+        v.fecha_fin,
+        v.motivo,
+        v.estado,
+        v.fecha_solicitud,
+        NULL AS dias_disponibles
+      FROM vacaciones v
+      JOIN empleados e ON v.empleado_id = e.id
+
+      ORDER BY fecha_solicitud DESC
+    `;
+
+    const [rows] = await db.promise().query(sql);
+    res.json(rows);
+
+  } catch (err) {
+    console.error("ERROR GET /rh/solicitudes:", err);
+    res.status(500).json({ message: "Error al obtener solicitudes RH" });
+  }
+});
