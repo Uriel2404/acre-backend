@@ -2543,11 +2543,9 @@ app.put("/ausentismo/:id", async (req, res) => {
     conn.release();
   }
 });
-
 //===================================
 // ADMINISTRAR TODAS LAS SOLICITUDES
 //===================================
-
 app.get("/solicitudes", async (req, res) => {
   try {
     const sql = `
@@ -2560,8 +2558,7 @@ app.get("/solicitudes", async (req, res) => {
         a.fecha_fin,
         a.motivo,
         a.estado,
-        a.fecha_solicitud,
-        NULL AS dias_disponibles
+        a.fecha_solicitud
       FROM ausentismo a
       JOIN empleados e ON a.empleado_id = e.id
 
@@ -2576,8 +2573,7 @@ app.get("/solicitudes", async (req, res) => {
         v.fecha_fin,
         v.motivo,
         v.estado,
-        v.fecha_solicitud,
-        NULL AS dias_disponibles
+        v.fecha_solicitud
       FROM vacaciones v
       JOIN empleados e ON v.empleado_id = e.id
 
@@ -2585,7 +2581,41 @@ app.get("/solicitudes", async (req, res) => {
     `;
 
     const [rows] = await db.promise().query(sql);
-    res.json(rows);
+
+    // ==============================
+    // CALCULAR DIAS DISPONIBLES SOLO
+    // PARA VACACIONES
+    // ==============================
+    const empleadosVacaciones = [
+      ...new Set(
+        rows
+          .filter(r => r.tipo === "Vacaciones")
+          .map(r => r.empleado_id)
+      )
+    ];
+
+    const diasPorEmpleado = {};
+
+    for (const empId of empleadosVacaciones) {
+      const { totalDisponibles } = await obtenerDiasDisponibles(
+        empId,
+        db.promise()
+      );
+      diasPorEmpleado[empId] = totalDisponibles;
+    }
+
+    // ==============================
+    // INYECTAR EN RESULTADO
+    // ==============================
+    const resultado = rows.map(r => ({
+      ...r,
+      dias_disponibles:
+        r.tipo === "Vacaciones"
+          ? diasPorEmpleado[r.empleado_id] ?? 0
+          : null
+    }));
+
+    res.json(resultado);
 
   } catch (err) {
     console.error("ERROR GET /solicitudes:", err);
