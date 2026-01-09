@@ -2548,7 +2548,7 @@ app.put("/ausentismo/:id", async (req, res) => {
 // ADMINISTRAR TODAS LAS SOLICITUDES
 //===================================
 
-app.get("/solicitudes/lista", async (req, res) => {
+app.get("/solicitudes", async (req, res) => {
   try {
     const sql = `
       SELECT 
@@ -2588,7 +2588,7 @@ app.get("/solicitudes/lista", async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error("ERROR GET /solicitudes/lista:", err);
+    console.error("ERROR GET /solicitudes:", err);
     res.status(500).json({ message: "Error al obtener solicitudes RH" });
   }
 });
