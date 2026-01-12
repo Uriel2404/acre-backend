@@ -2577,6 +2577,21 @@ app.get("/solicitudes", async (req, res) => {
       FROM vacaciones v
       JOIN empleados e ON v.empleado_id = e.id
 
+      UNION ALL
+
+      SELECT
+        r.id,
+        'Requisición de Personal' AS tipo,
+        r.empleado_id,
+        e.nombre AS nombre_empleado,
+        NULL AS fecha_inicio,
+        NULL AS fecha_fin,
+        r.motivo_puesto AS motivo,
+        r.estado,
+        r.fecha_solicitud
+      FROM requisicion_personal r
+      JOIN empleados e ON r.empleado_id = e.id
+
       ORDER BY fecha_solicitud DESC
     `;
 
@@ -2604,7 +2619,7 @@ app.get("/solicitudes", async (req, res) => {
     }
 
     // ==============================
-    // INYECTAR EN RESULTADO
+    // CALCULAR DIAS SOLICITADOS
     // ==============================
     const calcularDiasSolicitados = (inicio, fin) => {
       const fechaInicio = new Date(inicio);
@@ -2614,17 +2629,17 @@ app.get("/solicitudes", async (req, res) => {
     };
 
     const resultado = rows.map(r => ({
-    ...r,
-    dias_solicitados: calcularDiasSolicitados(
-      r.fecha_inicio,
-      r.fecha_fin
-    ),
-    dias_disponibles:
-      r.tipo === "Vacaciones"
-      ? diasPorEmpleado[r.empleado_id] ?? 0
-      : null
-    }));
+      ...r,
+      dias_solicitados:
+        r.fecha_inicio && r.fecha_fin
+          ? calcularDiasSolicitados(r.fecha_inicio, r.fecha_fin)
+          : null,
 
+      dias_disponibles:
+        r.tipo === "Vacaciones"
+          ? diasPorEmpleado[r.empleado_id] ?? 0
+          : null
+    }));
 
     res.json(resultado);
 
@@ -2633,6 +2648,7 @@ app.get("/solicitudes", async (req, res) => {
     res.status(500).json({ message: "Error al obtener solicitudes RH" });
   }
 });
+
 
 //===================================
 // REQUISICIÓN DE PERSONAL
