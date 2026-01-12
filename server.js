@@ -2673,9 +2673,6 @@ app.post("/requisicion-personal", async (req, res) => {
       responsabilidades
     } = req.body;
 
-    // ==============================
-    // VALIDACIONES BÁSICAS
-    // ==============================
     if (!empleado_id || !puesto || !departamento || !cantidad) {
       return res.status(400).json({
         error: true,
@@ -2732,5 +2729,131 @@ app.post("/requisicion-personal", async (req, res) => {
       error: true,
       message: "Error al registrar la requisición"
     });
+  }
+});
+
+
+//=====================================
+// APROBAR O RECHAZAR REQ. PERSONAL RH
+//=====================================
+app.put("/requisicion-personal/:id", async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  const estadosPermitidos = ["Aprobada", "Rechazada"];
+  if (!estadosPermitidos.includes(estado)) {
+    return res.status(400).json({ error: "Estado no permitido" });
+  }
+
+  const conn = await db.promise().getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1️⃣ Obtener solicitud + empleado
+    const [rows] = await conn.query(
+      `
+      SELECT a.id, a.empleado_id, a.estado AS estado_actual, e.nombre, e.correo
+      FROM requisicion_personal a
+      JOIN empleados e ON a.empleado_id = e.id
+      WHERE a.id = ? FOR UPDATE
+      `,
+      [id]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    const solicitud = rows[0];
+
+    if (solicitud.estado_actual !== "Pendiente RH") {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `La solicitud no puede ser procesada en estado: ${solicitud.estado_actual}`
+      });
+    }
+
+    // 2️⃣ Actualizar estado
+    await conn.query(
+      `
+      UPDATE requisicion_personal
+      SET estado = ?, aprobado_rh = ?
+      WHERE id = ?
+      `,
+      [estado, estado === "Aprobada" ? 1 : 0, id]
+    );
+
+    await conn.commit();
+
+    // ======================
+    // ENVIAR CORREO AL EMPLEADO
+    // ======================
+    try {
+      let subject = "";
+      if (estado === "Aprobada") subject = "Requisición personal aprobada";
+      if (estado === "Rechazada") subject = "Requisición personal rechazada";
+
+      if (subject) {
+        const message = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+          <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+            <tr>
+              <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+                <h2>${subject}</h2>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px; color:#333;">
+                <p>Hola <strong>${solicitud.nombre}</strong>,</p>
+
+                ${
+                  estado === "Aprobada"
+                    ? `<p>Tu solicitud de ausentismo fue <strong style="color:#127726;">APROBADA</strong>.</p>`
+                    : `<p>Tu solicitud de ausentismo fue <strong style="color:#b91c1c;">RECHAZADA</strong>.</p>`
+                }
+
+                <p><strong>Fechas:</strong> ${solicitud.fecha_inicio} al ${solicitud.fecha_fin}</p>
+
+                <p style="font-size:12px; color:#777;">
+                  Este mensaje fue enviado automáticamente por la Intranet ACRE.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        `;
+
+        await fetch("https://acre.mx/api/send-mail.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": process.env.MAIL_API_KEY
+          },
+          body: JSON.stringify({
+            to: solicitud.correo,
+            subject,
+            message
+          })
+        });
+      }
+    } catch (mailError) {
+      console.error("❌ Error enviando correo empleado:", mailError);
+    }
+
+    return res.json({
+      ok: true,
+      message: `Solicitud ${estado.toLowerCase()} correctamente`
+    });
+
+  } catch (err) {
+    await conn.rollback();
+    console.error("ERROR PUT /requisicion-personal/:id", err);
+    return res.status(500).json({ error: "Error procesando solicitud RH" });
+  } finally {
+    conn.release();
   }
 });
