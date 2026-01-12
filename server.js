@@ -2582,10 +2582,9 @@ app.get("/solicitudes", async (req, res) => {
 
     const [rows] = await db.promise().query(sql);
 
-    // ==============================
-    // CALCULAR DIAS DISPONIBLES SOLO
-    // PARA VACACIONES
-    // ==============================
+    // ==============================================
+    // CALCULAR DIAS DISPONIBLES SOLO PARA VACACIONES
+    // ==============================================
     const empleadosVacaciones = [
       ...new Set(
         rows
@@ -2632,5 +2631,90 @@ app.get("/solicitudes", async (req, res) => {
   } catch (err) {
     console.error("ERROR GET /solicitudes:", err);
     res.status(500).json({ message: "Error al obtener solicitudes RH" });
+  }
+});
+
+//===================================
+// REQUISICIÓN DE PERSONAL
+//===================================
+app.post("/requisicion-personal", async (req, res) => {
+  try {
+    const {
+      empleado_id,
+      puesto,
+      departamento,
+      cantidad,
+      turno,
+      respondeA,
+      motivoPuesto,
+      empleadoReemplaza,
+      funciones,
+      formacion,
+      formacionOtra,
+      habilidadesInfo,
+      habilidadTecnica,
+      habilidadTecnicaOtra,
+      responsabilidades
+    } = req.body;
+
+    // ==============================
+    // VALIDACIONES BÁSICAS
+    // ==============================
+    if (!empleado_id || !puesto || !departamento || !cantidad) {
+      return res.status(400).json({
+        error: true,
+        message: "Faltan campos obligatorios"
+      });
+    }
+
+    const sql = `
+      INSERT INTO requisicion_personal (
+        empleado_id,
+        puesto,
+        departamento,
+        cantidad,
+        turno,
+        responde_a,
+        motivo_puesto,
+        empleado_reemplaza,
+        funciones,
+        formacion,
+        formacion_otra,
+        habilidades_informaticas,
+        habilidades_tecnicas,
+        habilidades_tecnicas_otra,
+        responsabilidades
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    await db.promise().query(sql, [
+      empleado_id,
+      puesto,
+      departamento,
+      cantidad,
+      turno,
+      respondeA,
+      motivoPuesto,
+      empleadoReemplaza || null,
+      JSON.stringify(funciones),
+      formacion,
+      formacionOtra || null,
+      JSON.stringify(habilidadesInfo),
+      habilidadTecnica,
+      habilidadTecnicaOtra || null,
+      JSON.stringify(responsabilidades)
+    ]);
+
+    res.json({
+      ok: true,
+      message: "Requisición enviada correctamente"
+    });
+
+  } catch (err) {
+    console.error("ERROR POST /requisicion-personal:", err);
+    res.status(500).json({
+      error: true,
+      message: "Error al registrar la requisición"
+    });
   }
 });
