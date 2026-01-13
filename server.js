@@ -3056,3 +3056,137 @@ app.put("/requisicion-personal/:id", async (req, res) => {
     conn.release();
   }
 });
+
+
+
+
+//===================================
+// SOLICITAR CONSTANCIA / RECIBO
+//===================================
+app.post("/constancia", async (req, res) => {
+  try {
+    const {
+      empleado_id,
+      tipo,
+      motivo
+    } = req.body;
+
+    if (!empleado_id || !tipo) {
+      return res.status(400).json({
+        error: true,
+        message: "Faltan campos obligatorios"
+      });
+    }
+
+    // ==============================
+    // OBTENER EMPLEADO
+    // ==============================
+    const [empRows] = await db.promise().query(
+      "SELECT nombre, correo FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
+
+    if (!empRows.length) {
+      return res.status(404).json({
+        error: true,
+        message: "Empleado no encontrado"
+      });
+    }
+
+    const empleado = empRows[0];
+
+    // ==============================
+    // GUARDAR SOLICITUD
+    // ==============================
+    const sql = `
+      INSERT INTO constancias (
+        empleado_id,
+        tipo,
+        motivo
+      ) VALUES (?, ?, ?)
+    `;
+
+    await db.promise().query(sql, [
+      empleado_id,
+      tipo,
+      motivo || null
+    ]);
+
+    // ==============================
+    // ENVIAR CORREO A RH
+    // ==============================
+    try {
+      const mensajeRH = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <body style="background:#f3f4f6; font-family:Arial; padding:30px;">
+        <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+          <tr>
+            <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+              <h2>Nueva solicitud de ${tipo}</h2>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:20px; color:#333;">
+              <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+              <p><strong>Tipo:</strong> ${tipo}</p>
+
+              <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+              <p><strong>Motivo:</strong><br>
+                ${motivo || "No especificado"}
+              </p>
+
+              <span style="
+                display:inline-block;
+                padding:6px 14px;
+                background:#fef3c7;
+                color:#92400e;
+                border-radius:20px;
+                font-size:12px;
+                font-weight:bold;
+              ">
+                PENDIENTE RH
+              </span>
+
+              <p style="font-size:12px; color:#777; margin-top:20px;">
+                Mensaje automático generado por la Intranet ACRE
+              </p>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+      `;
+
+      await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: "uriel.ruiz@acre.mx", // RH
+          subject: `Nueva solicitud de ${tipo}`,
+          message: mensajeRH
+        })
+      });
+
+    } catch (mailError) {
+      console.error("❌ Error enviando correo RH:", mailError);
+    }
+
+    res.json({
+      ok: true,
+      message: "Solicitud enviada correctamente"
+    });
+
+  } catch (err) {
+    console.error("ERROR POST /constancia:", err);
+    res.status(500).json({
+      error: true,
+      message: "Error al registrar solicitud"
+    });
+  }
+});
