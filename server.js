@@ -2603,6 +2603,22 @@ app.get("/solicitudes", async (req, res) => {
         UNION ALL
 
         SELECT
+          c.id,
+          c.tipo AS tipo,
+          c.empleado_id,
+          e.nombre AS nombre_empleado,
+          NULL AS fecha_inicio,
+          NULL AS fecha_fin,
+          c.motivo,
+          c.estado,
+          c.fecha_solicitud
+        FROM constancias c
+        JOIN empleados e ON c.empleado_id = e.id
+
+
+        UNION ALL
+
+        SELECT
           r.id,
           'Requisición de Personal' AS tipo,
           r.empleado_id,
