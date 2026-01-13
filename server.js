@@ -2718,6 +2718,104 @@ app.post("/requisicion-personal", async (req, res) => {
       JSON.stringify(responsabilidades)
     ]);
 
+    
+    // ==============================
+    // ENVIAR CORREO A RH
+    // ==============================
+    try {
+      const mensajeRH = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Nueva Requisición de Personal</title>
+      </head>
+
+      <body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6; padding:30px 0;">
+          <tr>
+            <td align="center">
+
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
+
+                <tr>
+                  <td style="background-color:#ff0084; padding:20px; text-align:center;">
+                    <h1 style="margin:0; color:#ffffff; font-size:22px;">
+                      📄 Nueva Requisición de Personal
+                    </h1>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding:25px; color:#333333; font-size:14px; line-height:1.6;">
+
+                    <p><strong>Empleado solicitante:</strong> ${empleado?.nombre || "No identificado"}</p>
+
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                    <p><strong>Puesto:</strong> ${puesto}</p>
+                    <p><strong>Departamento:</strong> ${departamento}</p>
+                    <p><strong>Cantidad solicitada:</strong> ${cantidad}</p>
+                    <p><strong>Turno:</strong> ${turno || "No especificado"}</p>
+
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                    <p><strong>Motivo del puesto:</strong> ${motivoPuesto}</p>
+                    <p><strong>Responde a:</strong> ${respondeA || "No especificado"}</p>
+
+                    <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+                    <span style="
+                      display:inline-block;
+                      padding:6px 14px;
+                      background-color:#fef3c7;
+                      color:#92400e;
+                      border-radius:20px;
+                      font-size:12px;
+                      font-weight:bold;
+                    ">
+                      PENDIENTE RH
+                    </span>
+
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="background-color:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+                    Mensaje automático generado por la Intranet ACRE<br>
+                    No responder este correo
+                  </td>
+                </tr>
+
+              </table>
+
+            </td>
+          </tr>
+        </table>
+
+      </body>
+      </html>
+      `;
+
+      await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: "uriel.ruiz@acre.mx", // RH
+          subject: "Nueva requisición de personal",
+          message: mensajeRH
+        })
+      });
+
+    } catch (mailError) {
+      console.error("❌ Error enviando correo a RH:", mailError);
+    }
+
+
     res.json({
       ok: true,
       message: "Requisición enviada correctamente"
