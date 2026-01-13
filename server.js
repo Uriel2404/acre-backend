@@ -2778,3 +2778,46 @@ app.get("/requisicion-personal/:id", async (req, res) => {
     });
   }
 });
+
+//===================================
+// APROBAR / RECHAZAR REQUISICIÓN RH
+//===================================
+app.put("/requisicion-personal/:id", async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  const estadosPermitidos = ["Aprobada", "Rechazada"];
+  if (!estadosPermitidos.includes(estado)) {
+    return res.status(400).json({ error: "Estado no permitido" });
+  }
+
+  try {
+    const [result] = await db.promise().query(
+      `
+      UPDATE requisicion_personal
+      SET estado = ?
+      WHERE id = ?
+      `,
+      [estado, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        error: true,
+        message: "Requisición no encontrada"
+      });
+    }
+
+    res.json({
+      ok: true,
+      message: `Requisición ${estado.toLowerCase()} correctamente`
+    });
+
+  } catch (err) {
+    console.error("ERROR PUT /requisicion-personal/:id", err);
+    res.status(500).json({
+      error: true,
+      message: "Error procesando requisición"
+    });
+  }
+});
