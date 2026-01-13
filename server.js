@@ -2832,10 +2832,10 @@ app.put("/requisicion-personal/:id", async (req, res) => {
     await conn.query(
       `
       UPDATE requisicion_personal
-      SET estado = ?, aprobado_rh = ?
+      SET estado = ?
       WHERE id = ?
       `,
-      [estado, estado === "Aprobada" ? 1 : 0, id]
+      [estado, id]
     );
 
     await conn.commit();
