@@ -2791,33 +2791,127 @@ app.put("/requisicion-personal/:id", async (req, res) => {
     return res.status(400).json({ error: "Estado no permitido" });
   }
 
+  const conn = await db.promise().getConnection();
   try {
-    const [result] = await db.promise().query(
+    await conn.beginTransaction();
+
+    // 1️⃣ Obtener requisición + empleado
+    const [rows] = await conn.query(
       `
-      UPDATE requisicion_personal
-      SET estado = ?
-      WHERE id = ?
+      SELECT 
+        r.id,
+        r.empleado_id,
+        r.puesto,
+        r.departamento,
+        r.cantidad,
+        r.estado AS estado_actual,
+        e.nombre,
+        e.correo
+      FROM requisicion_personal r
+      JOIN empleados e ON r.empleado_id = e.id
+      WHERE r.id = ? FOR UPDATE
       `,
-      [estado, id]
+      [id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        error: true,
-        message: "Requisición no encontrada"
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Requisición no encontrada" });
+    }
+
+    const requisicion = rows[0];
+
+    if (requisicion.estado_actual !== "Pendiente RH") {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `La requisición no puede ser procesada en estado: ${requisicion.estado_actual}`
       });
     }
 
-    res.json({
+    // 2️⃣ Actualizar estado
+    await conn.query(
+      `
+      UPDATE requisicion_personal
+      SET estado = ?, aprobado_rh = ?
+      WHERE id = ?
+      `,
+      [estado, estado === "Aprobada" ? 1 : 0, id]
+    );
+
+    await conn.commit();
+
+    // ======================
+    // ENVIAR CORREO AL EMPLEADO
+    // ======================
+    try {
+      let subject = "";
+      if (estado === "Aprobada") subject = "Requisición de personal aprobada";
+      if (estado === "Rechazada") subject = "Requisición de personal rechazada";
+
+      if (subject) {
+        const message = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+          <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+            <tr>
+              <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+                <h2>${subject}</h2>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px; color:#333;">
+                <p>Hola <strong>${requisicion.nombre}</strong>,</p>
+
+                ${
+                  estado === "Aprobada"
+                    ? `<p>Tu requisición de personal fue <strong style="color:#127726;">APROBADA</strong>.</p>`
+                    : `<p>Tu requisición de personal fue <strong style="color:#b91c1c;">RECHAZADA</strong>.</p>`
+                }
+
+                <p><strong>Puesto:</strong> ${requisicion.puesto}</p>
+                <p><strong>Departamento:</strong> ${requisicion.departamento}</p>
+                <p><strong>Cantidad solicitada:</strong> ${requisicion.cantidad}</p>
+
+                <p style="font-size:12px; color:#777; margin-top:20px;">
+                  Este mensaje fue enviado automáticamente por la Intranet ACRE.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        `;
+
+        await fetch("https://acre.mx/api/send-mail.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": process.env.MAIL_API_KEY
+          },
+          body: JSON.stringify({
+            to: requisicion.correo,
+            subject,
+            message
+          })
+        });
+      }
+    } catch (mailError) {
+      console.error("❌ Error enviando correo requisición:", mailError);
+    }
+
+    return res.json({
       ok: true,
       message: `Requisición ${estado.toLowerCase()} correctamente`
     });
 
   } catch (err) {
+    await conn.rollback();
     console.error("ERROR PUT /requisicion-personal/:id", err);
-    res.status(500).json({
-      error: true,
-      message: "Error procesando requisición"
+    return res.status(500).json({
+      error: "Error procesando requisición RH"
     });
+  } finally {
+    conn.release();
   }
 });
