@@ -3138,7 +3138,7 @@ app.post("/constancia", async (req, res) => {
       <body style="background:#f3f4f6; font-family:Arial; padding:30px;">
         <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
           <tr>
-            <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+            <td style="background:#6c0654; color:#ffffff; padding:20px; text-align:center;">
               <h2>Nueva solicitud de ${tipo}</h2>
             </td>
           </tr>
