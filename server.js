@@ -3273,8 +3273,8 @@ app.put("/constancia/:id", async (req, res) => {
     // ======================
     try {
       let subject = "";
-      if (estado === "Aprobada") subject = "constancia de personal aprobada";
-      if (estado === "Rechazada") subject = "constancia de personal rechazada";
+      if (estado === "Aprobada") subject = "Documento personal aprobado";
+      if (estado === "Rechazada") subject = "Documento personal rechazado";
 
       if (subject) {
         const message = `
