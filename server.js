@@ -2544,61 +2544,85 @@ app.put("/ausentismo/:id", async (req, res) => {
   }
 });
 //===================================
-// ADMINISTRAR TODAS LAS SOLICITUDES
+// ADMINISTRAR TODAS LAS SOLICITUDES (PAGINADO)
 //===================================
 app.get("/solicitudes", async (req, res) => {
   try {
-    const sql = `
-      SELECT 
-        a.id,
-        'Ausentismo' AS tipo,
-        a.empleado_id,
-        e.nombre AS nombre_empleado,
-        a.fecha_inicio,
-        a.fecha_fin,
-        a.motivo,
-        a.estado,
-        a.fecha_solicitud
-      FROM ausentismo a
-      JOIN empleados e ON a.empleado_id = e.id
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
 
-      UNION ALL
-
-      SELECT 
-        v.id,
-        'Vacaciones' AS tipo,
-        v.empleado_id,
-        e.nombre AS nombre_empleado,
-        v.fecha_inicio,
-        v.fecha_fin,
-        v.motivo,
-        v.estado,
-        v.fecha_solicitud
-      FROM vacaciones v
-      JOIN empleados e ON v.empleado_id = e.id
-
-      UNION ALL
-
-      SELECT
-        r.id,
-        'Requisición de Personal' AS tipo,
-        r.empleado_id,
-        e.nombre AS nombre_empleado,
-        NULL AS fecha_inicio,
-        NULL AS fecha_fin,
-        r.motivo_puesto AS motivo,
-        r.estado,
-        r.fecha_solicitud
-      FROM requisicion_personal r
-      JOIN empleados e ON r.empleado_id = e.id
-
-      ORDER BY fecha_solicitud DESC
+    // ==============================
+    // TOTAL DE REGISTROS
+    // ==============================
+    const countSql = `
+      SELECT COUNT(*) AS total FROM (
+        SELECT id FROM ausentismo
+        UNION ALL
+        SELECT id FROM vacaciones
+        UNION ALL
+        SELECT id FROM requisicion_personal
+      ) t
     `;
 
-    const [rows] = await db.promise().query(sql);
+    const [[{ total }]] = await db.promise().query(countSql);
+
+    // ==============================
+    // CONSULTA PRINCIPAL PAGINADA
+    // ==============================
+    const sql = `
+      SELECT * FROM (
+        SELECT 
+          a.id,
+          'Ausentismo' AS tipo,
+          a.empleado_id,
+          e.nombre AS nombre_empleado,
+          a.fecha_inicio,
+          a.fecha_fin,
+          a.motivo,
+          a.estado,
+          a.fecha_solicitud
+        FROM ausentismo a
+        JOIN empleados e ON a.empleado_id = e.id
+
+        UNION ALL
+
+        SELECT 
+          v.id,
+          'Vacaciones' AS tipo,
+          v.empleado_id,
+          e.nombre AS nombre_empleado,
+          v.fecha_inicio,
+          v.fecha_fin,
+          v.motivo,
+          v.estado,
+          v.fecha_solicitud
+        FROM vacaciones v
+        JOIN empleados e ON v.empleado_id = e.id
+
+        UNION ALL
+
+        SELECT
+          r.id,
+          'Requisición de Personal' AS tipo,
+          r.empleado_id,
+          e.nombre AS nombre_empleado,
+          NULL AS fecha_inicio,
+          NULL AS fecha_fin,
+          r.motivo_puesto AS motivo,
+          r.estado,
+          r.fecha_solicitud
+        FROM requisicion_personal r
+        JOIN empleados e ON r.empleado_id = e.id
+      ) solicitudes
+      ORDER BY fecha_solicitud DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await db.promise().query(sql, [limit, offset]);
 
     // ==============================================
-    // CALCULAR DIAS DISPONIBLES SOLO PARA VACACIONES
+    // CALCULAR DIAS DISPONIBLES (VACACIONES)
     // ==============================================
     const empleadosVacaciones = [
       ...new Set(
@@ -2622,6 +2646,7 @@ app.get("/solicitudes", async (req, res) => {
     // CALCULAR DIAS SOLICITADOS
     // ==============================
     const calcularDiasSolicitados = (inicio, fin) => {
+      if (!inicio || !fin) return null;
       const fechaInicio = new Date(inicio);
       const fechaFin = new Date(fin);
       const msPorDia = 1000 * 60 * 60 * 24;
@@ -2630,18 +2655,26 @@ app.get("/solicitudes", async (req, res) => {
 
     const resultado = rows.map(r => ({
       ...r,
-      dias_solicitados:
-        r.fecha_inicio && r.fecha_fin
-          ? calcularDiasSolicitados(r.fecha_inicio, r.fecha_fin)
-          : null,
-
+      dias_solicitados: calcularDiasSolicitados(
+        r.fecha_inicio,
+        r.fecha_fin
+      ),
       dias_disponibles:
         r.tipo === "Vacaciones"
           ? diasPorEmpleado[r.empleado_id] ?? 0
           : null
     }));
 
-    res.json(resultado);
+    // ==============================
+    // RESPUESTA FINAL
+    // ==============================
+    res.json({
+      data: resultado,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    });
 
   } catch (err) {
     console.error("ERROR GET /solicitudes:", err);
