@@ -3318,7 +3318,7 @@ app.put("/constancia/:id", async (req, res) => {
             "X-API-KEY": process.env.MAIL_API_KEY
           },
           body: JSON.stringify({
-            to: requisicion.correo,
+            to: constancia.correo,
             subject,
             message
           })
