@@ -2679,6 +2679,16 @@ app.post("/requisicion-personal", async (req, res) => {
         message: "Faltan campos obligatorios"
       });
     }
+    // ==============================
+    // OBTENER EMPLEADO (para correo RH)
+    // ==============================
+    const [empRows] = await db.promise().query(
+      "SELECT nombre FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
+
+    const empleado = empRows[0];
+
 
     const sql = `
       INSERT INTO requisicion_personal (
