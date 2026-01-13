@@ -1245,7 +1245,7 @@ app.post("/upload-desarrollo", upload.single("imagen"), async (req, res) => {
 
                 <!-- HEADER -->
                 <tr>
-                  <td style="background-color:#127726; padding:20px; text-align:center;">
+                  <td style="background-color:#2563eb; padding:20px; text-align:center;">
                     <h1 style="margin:0; color:#ffffff; font-size:22px;">
                       📩 Nueva Solicitud de Vacaciones
                     </h1>
@@ -2181,7 +2181,7 @@ app.post("/ausentismo", async (req, res) => {
 
               <!-- HEADER -->
               <tr>
-                <td style="background-color:#127726; padding:20px; text-align:center;">
+                <td style="background-color:#f59e0b; padding:20px; text-align:center;">
                   <h1 style="margin:0; color:#ffffff; font-size:22px;">
                     📩 Nueva Solicitud de Ausentismo
                   </h1>
@@ -2750,7 +2750,7 @@ app.post("/requisicion-personal", async (req, res) => {
               <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden;">
 
                 <tr>
-                  <td style="background-color:#ff0084; padding:20px; text-align:center;">
+                  <td style="background-color:#03c0a7; padding:20px; text-align:center;">
                     <h1 style="margin:0; color:#ffffff; font-size:22px;">
                       📄 Nueva Requisición de Personal
                     </h1>
