@@ -2543,6 +2543,7 @@ app.put("/ausentismo/:id", async (req, res) => {
     conn.release();
   }
 });
+
 //===================================
 // ADMINISTRAR TODAS LAS SOLICITUDES (PAGINADO)
 //===================================
@@ -2560,6 +2561,8 @@ app.get("/solicitudes", async (req, res) => {
         SELECT id FROM ausentismo
         UNION ALL
         SELECT id FROM vacaciones
+        UNION ALL
+        SELECT id FROM constancias
         UNION ALL
         SELECT id FROM requisicion_personal
       ) t
