@@ -3654,6 +3654,8 @@ app.put("/prestamo-personal/:id", async (req, res) => {
           message
         })
       });
+      
+      
 
     } catch (mailError) {
       console.error("❌ Error enviando correo préstamo:", mailError);
@@ -3674,3 +3676,4 @@ app.put("/prestamo-personal/:id", async (req, res) => {
     conn.release();
   }
 });
+
