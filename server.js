@@ -4002,74 +4002,101 @@ app.post(
 // =============================
 // ELIMINAR PÓLIZA
 // =============================
-app.delete(
-  "/polizas/:categoria/:id",
-  async (req, res) => {
-    const { categoria, id } = req.params;
-
-    try {
-      // 1️⃣ Obtener archivo
-      const [[poliza]] = await db.promise().query(
-        "SELECT archivo_url FROM polizas WHERE id = ?",
-        [id]
-      );
-
-      if (!poliza) {
-        return res.status(404).json({ message: "Póliza no encontrada" });
-      }
-
-      // 2️⃣ Borrar archivo del FTP
-      try {
-        const fileName = poliza.archivo_url.split("/").pop();
-        const remotePath = `/public_html/Intranet/polizas/${categoria}/${fileName}`;
-
-        const client = new ftp.Client();
-        await client.access({
-          host: process.env.FTP_HOST,
-          user: process.env.FTP_USER,
-          password: process.env.FTP_PASS,
-          secure: false
-        });
-
-        await client.remove(remotePath);
-        client.close();
-      } catch (ftpErr) {
-        console.warn("No se pudo borrar archivo FTP:", ftpErr.message);
-      }
-
-      // 3️⃣ Borrar tablas específicas
-      if (categoria === "utilitarios") {
-        await db.promise().query(
-          "DELETE FROM polizas_utilitarios WHERE poliza_id = ?",
-          [id]
-        );
-      }
-
-      if (categoria === "maquinaria") {
-        await db.promise().query(
-          "DELETE FROM polizas_maquinaria WHERE poliza_id = ?",
-          [id]
-        );
-      }
-
-      if (categoria === "empresarial") {
-        await db.promise().query(
-          "DELETE FROM polizas_empresarial WHERE poliza_id = ?",
-          [id]
-        );
-      }
-
-      // 4️⃣ Borrar tabla principal
-      await db.promise().query("DELETE FROM polizas WHERE id = ?", [id]);
-
-      res.json({ ok: true, message: "Póliza eliminada correctamente" });
-
-    } catch (err) {
-      console.error("ERROR DELETE POLIZA:", err);
-      res.status(500).json({ message: "Error al eliminar póliza" });
+// =============================
+// ELIMINAR PÓLIZA (ESTILO DOCUMENTS)
+// body: { id, categoria }
+// =============================
+app.post("/polizas/delete", async (req, res) => {
+  try {
+    const { id, categoria } = req.body;
+    if (!id || !categoria) {
+      return res.status(400).json({ message: "Faltan datos" });
     }
+
+    // 1️⃣ Obtener póliza
+    db.query(
+      "SELECT archivo_url FROM polizas WHERE id = ?",
+      [id],
+      async (err, rows) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ message: "Error BD" });
+        }
+        if (!rows.length) {
+          return res.status(404).json({ message: "Póliza no encontrada" });
+        }
+
+        const poliza = rows[0];
+
+        // 2️⃣ Borrar archivo por FTP (NO rompe si falla)
+        try {
+          const filename = poliza.archivo_url.split("/").pop();
+          const safeCategoria = categoria.replace(/\s+/g, "_");
+          const remotePath = `/public_html/Intranet/polizas/${safeCategoria}/${filename}`;
+
+          const client = new ftp.Client();
+          await client.access({
+            host: process.env.FTP_HOST,
+            user: process.env.FTP_USER,
+            password: process.env.FTP_PASS,
+            secure: false
+          });
+
+          try {
+            await client.remove(remotePath);
+          } catch (e) {
+            console.warn("No se pudo borrar archivo remoto:", e.message);
+          }
+
+          client.close();
+        } catch (ftpErr) {
+          console.warn("Error FTP (ignorado):", ftpErr.message);
+        }
+
+        // 3️⃣ Borrar tabla específica
+        let deleteSpecific = null;
+        if (categoria === "utilitarios") {
+          deleteSpecific = "DELETE FROM polizas_utilitarios WHERE poliza_id = ?";
+        }
+        if (categoria === "maquinaria") {
+          deleteSpecific = "DELETE FROM polizas_maquinaria WHERE poliza_id = ?";
+        }
+        if (categoria === "empresarial") {
+          deleteSpecific = "DELETE FROM polizas_empresarial WHERE poliza_id = ?";
+        }
+
+        const borrarEspecifica = cb => {
+          if (!deleteSpecific) return cb();
+          db.query(deleteSpecific, [id], cb);
+        };
+
+        borrarEspecifica(err2 => {
+          if (err2) {
+            console.error(err2);
+            return res.status(500).json({ message: "Error borrando detalle" });
+          }
+
+          // 4️⃣ Borrar tabla principal
+          db.query(
+            "DELETE FROM polizas WHERE id = ?",
+            [id],
+            err3 => {
+              if (err3) {
+                console.error(err3);
+                return res.status(500).json({ message: "Error borrando póliza" });
+              }
+
+              res.json({ message: "Póliza eliminada correctamente" });
+            }
+          );
+        });
+      }
+    );
+  } catch (err) {
+    console.error("ERROR DELETE POLIZA:", err);
+    res.status(500).json({ message: "Error general" });
   }
-);
+});
 
 
 // =============================
