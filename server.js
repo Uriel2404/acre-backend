@@ -4075,6 +4075,7 @@ app.delete(
   }
 );
 
+
 // =============================
 // ACTUALIZAR PÓLIZA
 // =============================
@@ -4086,6 +4087,16 @@ app.put(
     const { categoria, id } = req.params;
 
     try {
+      // 0️⃣ Verificar que exista la póliza
+      const [[poliza]] = await db.promise().query(
+        "SELECT archivo_url FROM polizas WHERE id = ?",
+        [id]
+      );
+
+      if (!poliza) {
+        return res.status(404).json({ message: "Póliza no encontrada" });
+      }
+
       const {
         numero_poliza,
         aseguradora,
@@ -4117,7 +4128,7 @@ app.put(
             extra.concepto,
             extra.serie,
             extra.asignado,
-            extra.estatus,
+            extra.estatus || "vigente",
             extra.agencia,
             id
           ]
@@ -4142,17 +4153,55 @@ app.put(
           SET beneficiario=?, tipo=?, estatus=?
           WHERE poliza_id=?
           `,
-          [extra.beneficiario, extra.tipo, extra.estatus, id]
+          [
+            extra.beneficiario,
+            extra.tipo,
+            extra.estatus || "vigente",
+            id
+          ]
         );
       }
 
-      // 3️⃣ Si viene PDF nuevo → reemplazar
+      // 3️⃣ Si viene PDF nuevo → reemplazar archivo
       if (req.file) {
-        // (usar lógica FTP que ya tienes)
-        // actualizar archivo_url
+        const oldFile = poliza.archivo_url.split("/").pop();
+        const localPath = req.file.path;
+        const fileName = Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+        const remoteDir = `/public_html/Intranet/polizas/${categoria}`;
+        const remotePath = `${remoteDir}/${fileName}`;
+
+        const client = new ftp.Client();
+        await client.access({
+          host: process.env.FTP_HOST,
+          user: process.env.FTP_USER,
+          password: process.env.FTP_PASS,
+          secure: false
+        });
+
+        // borrar archivo anterior
+        try {
+          await client.remove(`${remoteDir}/${oldFile}`);
+        } catch (e) {
+          console.warn("No se pudo borrar archivo anterior");
+        }
+
+        // subir nuevo
+        await client.ensureDir(remoteDir);
+        await client.uploadFrom(localPath, remotePath);
+        client.close();
+
+        fs.unlinkSync(localPath);
+
+        const newUrl = `https://acre.mx/Intranet/polizas/${categoria}/${fileName}`;
+
+        await db.promise().query(
+          "UPDATE polizas SET archivo_url=? WHERE id=?",
+          [newUrl, id]
+        );
       }
 
-      res.json({ ok: true, message: "Póliza actualizada" });
+      res.json({ ok: true, message: "Póliza actualizada correctamente" });
 
     } catch (err) {
       console.error("ERROR PUT POLIZA:", err);
