@@ -4231,3 +4231,70 @@ app.put(
     }
   }
 );
+
+// =============================
+// SUBIR / CAMBIAR FOTO VEHÍCULO
+// =============================
+app.post(
+  "/polizas/:id/foto",
+  upload.single("foto"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!req.file) {
+        return res.status(400).json({ message: "No se recibió imagen" });
+      }
+
+      // 1️⃣ Obtener póliza
+      db.query(
+        "SELECT foto_url FROM polizas WHERE id = ?",
+        [id],
+        async (err, rows) => {
+          if (err) return res.status(500).json({ message: "Error BD" });
+          if (!rows.length)
+            return res.status(404).json({ message: "Póliza no encontrada" });
+
+          const poliza = rows[0];
+
+          // 2️⃣ FTP
+          const client = new ftp.Client();
+          await client.access({
+            host: process.env.FTP_HOST,
+            user: process.env.FTP_USER,
+            password: process.env.FTP_PASS,
+            secure: false
+          });
+
+          const fileName =
+            Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+          const remoteDir = `/public_html/Intranet/vehiculos`;
+          const remotePath = `${remoteDir}/${fileName}`;
+
+          await client.ensureDir(remoteDir);
+          await client.uploadFrom(req.file.path, remotePath);
+          client.close();
+
+          fs.unlinkSync(req.file.path);
+
+          const fotoUrl = `https://acre.mx/Intranet/vehiculos/${fileName}`;
+
+          // 3️⃣ Guardar URL
+          db.query(
+            "UPDATE polizas SET foto_url = ? WHERE id = ?",
+            [fotoUrl, id],
+            err2 => {
+              if (err2)
+                return res.status(500).json({ message: "Error guardando foto" });
+
+              res.json({ foto_url: fotoUrl });
+            }
+          );
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error subiendo foto" });
+    }
+  }
+);
