@@ -2565,6 +2565,8 @@ app.get("/solicitudes", async (req, res) => {
         SELECT id FROM constancias
         UNION ALL
         SELECT id FROM requisicion_personal
+        UNION ALL
+        SELECT id FROM prestamos_personales
       ) t
     `;
 
@@ -2617,6 +2619,21 @@ app.get("/solicitudes", async (req, res) => {
           c.fecha_solicitud
         FROM constancias c
         JOIN empleados e ON c.empleado_id = e.id
+
+        UNION ALL
+
+        SELECT
+          p.id,
+          'Préstamo Personal' AS tipo,
+          p.empleado_id,
+          e.nombre AS nombre_empleado,
+          NULL AS fecha_inicio,
+          NULL AS fecha_fin,
+          CONCAT('$', p.monto, ' / ', p.pagos, ' pagos') AS motivo,
+          p.estado,
+          p.fecha_solicitud
+        FROM prestamos_personales p
+        JOIN empleados e ON p.empleado_id = e.id
 
 
         UNION ALL
@@ -3341,5 +3358,146 @@ app.put("/constancia/:id", async (req, res) => {
     });
   } finally {
     conn.release();
+  }
+});
+
+
+
+
+//===================================
+// SOLICITAR PRÉSTAMO PERSONAL
+//===================================
+app.post("/prestamo-personal", async (req, res) => {
+  try {
+    const {
+      empleado_id,
+      monto,
+      pagosSolicitados,
+      motivo
+    } = req.body;
+
+    if (!empleado_id || !monto || !pagosSolicitados) {
+      return res.status(400).json({
+        error: true,
+        message: "Faltan campos obligatorios"
+      });
+    }
+
+    if (monto <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: "Monto inválido"
+      });
+    }
+
+    // ==============================
+    // CÁLCULO AUTOMÁTICO
+    // ==============================
+    const { pagos, descuento } = calcularPrestamo(
+      Number(monto),
+      Number(pagosSolicitados)
+    );
+
+    // ==============================
+    // INSERTAR EN BD
+    // ==============================
+    const sql = `
+      INSERT INTO prestamos_personales (
+        empleado_id,
+        monto,
+        pagos,
+        descuento_por_pago,
+        motivo
+      ) VALUES (?, ?, ?, ?, ?)
+    `;
+
+    await db.promise().query(sql, [
+      empleado_id,
+      monto,
+      pagos,
+      descuento,
+      motivo || null
+    ]);
+
+    // ==============================
+    // OBTENER EMPLEADO
+    // ==============================
+    const [[empleado]] = await db.promise().query(
+      "SELECT nombre, correo FROM empleados WHERE id = ?",
+      [empleado_id]
+    );
+
+    // ==============================
+    // ENVIAR CORREO A RH
+    // ==============================
+    try {
+      const mensajeRH = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+        <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+          <tr>
+            <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+              <h2>💰 Nueva solicitud de Préstamo Personal</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px; color:#333;">
+              <p><strong>Empleado:</strong> ${empleado.nombre}</p>
+              <p><strong>Monto solicitado:</strong> $${monto}</p>
+              <p><strong>Pagos:</strong> ${pagos}</p>
+              <p><strong>Descuento por pago:</strong> $${descuento}</p>
+
+              <p><strong>Motivo:</strong><br>
+                ${motivo || "No especificado"}
+              </p>
+
+              <span style="
+                display:inline-block;
+                padding:6px 14px;
+                background-color:#fef3c7;
+                color:#92400e;
+                border-radius:20px;
+                font-size:12px;
+                font-weight:bold;
+              ">
+                PENDIENTE RH
+              </span>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+      `;
+
+      await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: "uriel.ruiz@acre.mx",
+          subject: "Nueva solicitud de préstamo personal",
+          message: mensajeRH
+        })
+      });
+
+    } catch (mailError) {
+      console.error("❌ Error enviando correo RH préstamo:", mailError);
+    }
+
+    res.json({
+      ok: true,
+      message: "Solicitud de préstamo enviada correctamente",
+      data: { pagos, descuento }
+    });
+
+  } catch (err) {
+    console.error("ERROR POST /prestamo-personal:", err);
+    res.status(500).json({
+      error: true,
+      message: "Error al registrar el préstamo"
+    });
   }
 });
