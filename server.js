@@ -3677,6 +3677,88 @@ app.put("/prestamo-personal/:id", async (req, res) => {
   }
 });
 
-// ======================
-// POLIZAS DE VEHICULOS
-// ======================
+// =============================
+// OBETENER POLIZAS DE VEHICULOS
+// =============================
+
+app.get("/polizas/utilitarios", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT 
+        p.id,
+        u.unidad,
+        u.concepto,
+        u.serie,
+        u.asignado,
+        u.estatus,
+        u.agencia,
+        p.numero_poliza,
+        p.aseguradora,
+        p.fecha_inicio,
+        p.fecha_fin,
+        p.archivo_url
+      FROM polizas p
+      INNER JOIN polizas_utilitarios u ON p.id = u.poliza_id
+      WHERE p.categoria = 'utilitarios'
+      ORDER BY p.fecha_fin DESC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR POLIZAS UTILITARIOS:", err);
+    res.status(500).json({ message: "Error al obtener pólizas de utilitarios" });
+  }
+});
+
+app.get("/polizas/maquinaria", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT 
+        p.id,
+        m.unidad,
+        m.concepto,
+        m.serie,
+        p.numero_poliza,
+        p.aseguradora,
+        p.fecha_inicio,
+        p.fecha_fin,
+        p.archivo_url
+      FROM polizas p
+      INNER JOIN polizas_maquinaria m ON p.id = m.poliza_id
+      WHERE p.categoria = 'maquinaria'
+      ORDER BY p.fecha_fin DESC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR POLIZAS MAQUINARIA:", err);
+    res.status(500).json({ message: "Error al obtener pólizas de maquinaria" });
+  }
+});
+
+app.get("/polizas/empresarial", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT 
+        p.id,
+        e.beneficiario,
+        e.tipo,
+        e.estatus,
+        p.numero_poliza,
+        p.aseguradora,
+        p.fecha_inicio,
+        p.fecha_fin,
+        p.archivo_url
+      FROM polizas p
+      INNER JOIN polizas_empresarial e ON p.id = e.poliza_id
+      WHERE p.categoria = 'empresarial'
+      ORDER BY p.fecha_fin DESC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR POLIZAS EMPRESARIAL:", err);
+    res.status(500).json({ message: "Error al obtener pólizas empresariales" });
+  }
+});
+
