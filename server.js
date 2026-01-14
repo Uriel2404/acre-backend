@@ -3529,3 +3529,148 @@ app.post("/prestamo-personal", async (req, res) => {
     });
   }
 });
+
+
+//===================================
+// APROBAR / RECHAZAR PRÉSTAMO PERSONAL
+//===================================
+app.put("/prestamo-personal/:id", async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  const estadosPermitidos = ["Aprobada", "Rechazada"];
+  if (!estadosPermitidos.includes(estado)) {
+    return res.status(400).json({ error: "Estado no permitido" });
+  }
+
+  const conn = await db.promise().getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    // 1️⃣ Obtener préstamo + empleado
+    const [rows] = await conn.query(
+      `
+      SELECT 
+        p.id,
+        p.monto,
+        p.pagos,
+        p.descuento_por_pago,
+        p.motivo,
+        p.estado AS estado_actual,
+        e.nombre,
+        e.correo
+      FROM prestamos_personales p
+      JOIN empleados e ON p.empleado_id = e.id
+      WHERE p.id = ? FOR UPDATE
+      `,
+      [id]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Préstamo no encontrado" });
+    }
+
+    const prestamo = rows[0];
+
+    if (prestamo.estado_actual !== "Pendiente RH") {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `El préstamo no puede ser procesado en estado: ${prestamo.estado_actual}`
+      });
+    }
+
+    // 2️⃣ Actualizar estado
+    await conn.query(
+      `
+      UPDATE prestamos_personales
+      SET estado = ?
+      WHERE id = ?
+      `,
+      [estado, id]
+    );
+
+    await conn.commit();
+
+    // ======================
+    // ENVIAR CORREO AL EMPLEADO
+    // ======================
+    try {
+      const subject =
+        estado === "Aprobada"
+          ? "Préstamo personal aprobado"
+          : "Préstamo personal rechazado";
+
+      const message = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <body style="font-family:Arial; background:#f3f4f6; padding:30px;">
+        <table width="600" align="center" style="background:#ffffff; border-radius:8px;">
+          <tr>
+            <td style="background:#127726; color:#ffffff; padding:20px; text-align:center;">
+              <h2>${subject}</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px; color:#333;">
+              <p>Hola <strong>${prestamo.nombre}</strong>,</p>
+
+              ${
+                estado === "Aprobada"
+                  ? `<p>Tu solicitud de préstamo fue <strong style="color:#127726;">APROBADA</strong>.</p>`
+                  : `<p>Tu solicitud de préstamo fue <strong style="color:#b91c1c;">RECHAZADA</strong>.</p>`
+              }
+
+              <hr style="border:none; border-top:1px solid #e5e7eb; margin:15px 0;">
+
+              <p><strong>Monto:</strong> $${prestamo.monto}</p>
+              <p><strong>Pagos:</strong> ${prestamo.pagos}</p>
+              <p><strong>Descuento por pago:</strong> $${prestamo.descuento_por_pago}</p>
+
+              <p><strong>Motivo:</strong><br>
+                ${prestamo.motivo || "No especificado"}
+              </p>
+
+              <p style="font-size:12px; color:#777; margin-top:20px;">
+                Mensaje automático generado por la Intranet ACRE
+              </p>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+      `;
+
+      await fetch("https://acre.mx/api/send-mail.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": process.env.MAIL_API_KEY
+        },
+        body: JSON.stringify({
+          to: prestamo.correo,
+          subject,
+          message
+        })
+      });
+
+    } catch (mailError) {
+      console.error("❌ Error enviando correo préstamo:", mailError);
+    }
+
+    return res.json({
+      ok: true,
+      message: `Préstamo ${estado.toLowerCase()} correctamente`
+    });
+
+  } catch (err) {
+    await conn.rollback();
+    console.error("ERROR PUT /prestamo-personal/:id", err);
+    return res.status(500).json({
+      error: "Error procesando préstamo RH"
+    });
+  } finally {
+    conn.release();
+  }
+});
