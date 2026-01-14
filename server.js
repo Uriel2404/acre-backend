@@ -3361,8 +3361,18 @@ app.put("/constancia/:id", async (req, res) => {
   }
 });
 
+const calcularPrestamo = (monto, pagosSolicitados) => {
+  let maxPagos = 10;
 
+  if (monto <= 3000) {
+    maxPagos = 6;
+  }
 
+  const pagos = Math.min(pagosSolicitados, maxPagos);
+  const descuento = Number((monto / pagos).toFixed(2));
+
+  return { pagos, descuento };
+};
 
 //===================================
 // SOLICITAR PRÉSTAMO PERSONAL
@@ -3376,6 +3386,9 @@ app.post("/prestamo-personal", async (req, res) => {
       motivo
     } = req.body;
 
+    // ==============================
+    // VALIDACIONES
+    // ==============================
     if (!empleado_id || !monto || !pagosSolicitados) {
       return res.status(400).json({
         error: true,
@@ -3387,6 +3400,13 @@ app.post("/prestamo-personal", async (req, res) => {
       return res.status(400).json({
         error: true,
         message: "Monto inválido"
+      });
+    }
+
+    if (pagosSolicitados <= 0) {
+      return res.status(400).json({
+        error: true,
+        message: "Número de pagos inválido"
       });
     }
 
@@ -3407,8 +3427,9 @@ app.post("/prestamo-personal", async (req, res) => {
         monto,
         pagos,
         descuento_por_pago,
-        motivo
-      ) VALUES (?, ?, ?, ?, ?)
+        motivo,
+        estado
+      ) VALUES (?, ?, ?, ?, ?, 'Pendiente RH')
     `;
 
     await db.promise().query(sql, [
@@ -3426,6 +3447,13 @@ app.post("/prestamo-personal", async (req, res) => {
       "SELECT nombre, correo FROM empleados WHERE id = ?",
       [empleado_id]
     );
+
+    if (!empleado) {
+      return res.status(400).json({
+        error: true,
+        message: "Empleado no encontrado"
+      });
+    }
 
     // ==============================
     // ENVIAR CORREO A RH
@@ -3487,7 +3515,7 @@ app.post("/prestamo-personal", async (req, res) => {
       console.error("❌ Error enviando correo RH préstamo:", mailError);
     }
 
-    res.json({
+    return res.json({
       ok: true,
       message: "Solicitud de préstamo enviada correctamente",
       data: { pagos, descuento }
@@ -3495,7 +3523,7 @@ app.post("/prestamo-personal", async (req, res) => {
 
   } catch (err) {
     console.error("ERROR POST /prestamo-personal:", err);
-    res.status(500).json({
+    return res.status(500).json({
       error: true,
       message: "Error al registrar el préstamo"
     });
