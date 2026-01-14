@@ -3677,6 +3677,26 @@ app.put("/prestamo-personal/:id", async (req, res) => {
   }
 });
 
+
+//========================================
+//  V E H I C U L O S   Y   P Ó L I Z A S
+//========================================
+
+//===================
+//  SUBIR PÓLIZAS
+//===================
+const uploadPoliza = multer({
+  dest: "/tmp",
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== "application/pdf") {
+      cb(new Error("Solo se permiten archivos PDF"));
+    } else {
+      cb(null, true);
+    }
+  }
+});
+
 // =============================
 // OBETENER POLIZAS DE VEHICULOS
 // =============================
@@ -3762,3 +3782,222 @@ app.get("/polizas/empresarial", async (req, res) => {
   }
 });
 
+// =============================
+// REGISTRAR PÓLIZA DE VEHÍCULO
+// =============================
+app.post(
+  "/polizas/utilitarios",
+  uploadPoliza.single("archivo"),
+  validarRol(["Administrador", "RH"]),
+  async (req, res) => {
+    try {
+      const {
+        numero_poliza,
+        aseguradora,
+        fecha_inicio,
+        fecha_fin,
+        unidad,
+        concepto,
+        serie,
+        asignado,
+        estatus,
+        agencia
+      } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No se envió archivo PDF" });
+      }
+
+      // ======================
+      // SUBIR PDF A FTP
+      // ======================
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/polizas/utilitarios");
+      await client.uploadFrom(localPath, `/public_html/Intranet/polizas/utilitarios/${fileName}`);
+      client.close();
+
+      const archivoUrl = `https://acre.mx/Intranet/polizas/utilitarios/${fileName}`;
+      fs.unlinkSync(localPath);
+
+      // ======================
+      // INSERT BD
+      // ======================
+      const [polizaResult] = await db.promise().query(
+        `
+        INSERT INTO polizas
+        (categoria, numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivo_url)
+        VALUES ('utilitarios', ?, ?, ?, ?, ?)
+        `,
+        [numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivoUrl]
+      );
+
+      await db.promise().query(
+        `
+        INSERT INTO polizas_utilitarios
+        (poliza_id, unidad, concepto, serie, asignado, estatus, agencia)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          polizaResult.insertId,
+          unidad,
+          concepto,
+          serie,
+          asignado,
+          estatus || "vigente",
+          agencia
+        ]
+      );
+
+      res.json({ ok: true, message: "Póliza de utilitario registrada" });
+
+    } catch (err) {
+      console.error("ERROR POST POLIZA UTILITARIOS:", err);
+      res.status(500).json({ message: "Error al registrar póliza" });
+    }
+  }
+);
+
+app.post(
+  "/polizas/maquinaria",
+  uploadPoliza.single("archivo"),
+  validarRol(["Administrador", "RH"]),
+  async (req, res) => {
+    try {
+      const {
+        numero_poliza,
+        aseguradora,
+        fecha_inicio,
+        fecha_fin,
+        unidad,
+        concepto,
+        serie
+      } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No se envió archivo PDF" });
+      }
+
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/polizas/maquinaria");
+      await client.uploadFrom(localPath, `/public_html/Intranet/polizas/maquinaria/${fileName}`);
+      client.close();
+
+      const archivoUrl = `https://acre.mx/Intranet/polizas/maquinaria/${fileName}`;
+      fs.unlinkSync(localPath);
+
+      const [polizaResult] = await db.promise().query(
+        `
+        INSERT INTO polizas
+        (categoria, numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivo_url)
+        VALUES ('maquinaria', ?, ?, ?, ?, ?)
+        `,
+        [numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivoUrl]
+      );
+
+      await db.promise().query(
+        `
+        INSERT INTO polizas_maquinaria
+        (poliza_id, unidad, concepto, serie)
+        VALUES (?, ?, ?, ?)
+        `,
+        [polizaResult.insertId, unidad, concepto, serie]
+      );
+
+      res.json({ ok: true, message: "Póliza de maquinaria registrada" });
+
+    } catch (err) {
+      console.error("ERROR POST POLIZA MAQUINARIA:", err);
+      res.status(500).json({ message: "Error al registrar póliza" });
+    }
+  }
+);
+
+app.post(
+  "/polizas/empresarial",
+  uploadPoliza.single("archivo"),
+  validarRol(["Administrador", "RH"]),
+  async (req, res) => {
+    try {
+      const {
+        numero_poliza,
+        aseguradora,
+        fecha_inicio,
+        fecha_fin,
+        beneficiario,
+        tipo,
+        estatus
+      } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No se envió archivo PDF" });
+      }
+
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/polizas/empresarial");
+      await client.uploadFrom(localPath, `/public_html/Intranet/polizas/empresarial/${fileName}`);
+      client.close();
+
+      const archivoUrl = `https://acre.mx/Intranet/polizas/empresarial/${fileName}`;
+      fs.unlinkSync(localPath);
+
+      const [polizaResult] = await db.promise().query(
+        `
+        INSERT INTO polizas
+        (categoria, numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivo_url)
+        VALUES ('empresarial', ?, ?, ?, ?, ?)
+        `,
+        [numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivoUrl]
+      );
+
+      await db.promise().query(
+        `
+        INSERT INTO polizas_empresarial
+        (poliza_id, beneficiario, tipo, estatus)
+        VALUES (?, ?, ?, ?)
+        `,
+        [
+          polizaResult.insertId,
+          beneficiario,
+          tipo,
+          estatus || "vigente"
+        ]
+      );
+
+      res.json({ ok: true, message: "Póliza empresarial registrada" });
+
+    } catch (err) {
+      console.error("ERROR POST POLIZA EMPRESARIAL:", err);
+      res.status(500).json({ message: "Error al registrar póliza" });
+    }
+  }
+);
