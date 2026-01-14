@@ -3788,7 +3788,6 @@ app.get("/polizas/empresarial", async (req, res) => {
 app.post(
   "/polizas/utilitarios",
   uploadPoliza.single("archivo"),
-  validarRol(["Administrador", "RH"]),
   async (req, res) => {
     try {
       const {
@@ -3870,7 +3869,6 @@ app.post(
 app.post(
   "/polizas/maquinaria",
   uploadPoliza.single("archivo"),
-  validarRol(["Administrador", "RH"]),
   async (req, res) => {
     try {
       const {
@@ -3935,7 +3933,6 @@ app.post(
 app.post(
   "/polizas/empresarial",
   uploadPoliza.single("archivo"),
-  validarRol(["Administrador", "RH"]),
   async (req, res) => {
     try {
       const {
@@ -4007,7 +4004,6 @@ app.post(
 // =============================
 app.delete(
   "/polizas/:categoria/:id",
-  validarRol(["Administrador", "RH"]),
   async (req, res) => {
     const { categoria, id } = req.params;
 
@@ -4082,7 +4078,6 @@ app.delete(
 app.put(
   "/polizas/:categoria/:id",
   uploadPoliza.single("archivo"),
-  validarRol(["Administrador", "RH"]),
   async (req, res) => {
     const { categoria, id } = req.params;
 
