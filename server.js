@@ -4001,3 +4001,162 @@ app.post(
     }
   }
 );
+
+// =============================
+// ELIMINAR PÓLIZA
+// =============================
+app.delete(
+  "/polizas/:categoria/:id",
+  validarRol(["Administrador", "RH"]),
+  async (req, res) => {
+    const { categoria, id } = req.params;
+
+    try {
+      // 1️⃣ Obtener archivo
+      const [[poliza]] = await db.promise().query(
+        "SELECT archivo_url FROM polizas WHERE id = ?",
+        [id]
+      );
+
+      if (!poliza) {
+        return res.status(404).json({ message: "Póliza no encontrada" });
+      }
+
+      // 2️⃣ Borrar archivo del FTP
+      try {
+        const fileName = poliza.archivo_url.split("/").pop();
+        const remotePath = `/public_html/Intranet/polizas/${categoria}/${fileName}`;
+
+        const client = new ftp.Client();
+        await client.access({
+          host: process.env.FTP_HOST,
+          user: process.env.FTP_USER,
+          password: process.env.FTP_PASS,
+          secure: false
+        });
+
+        await client.remove(remotePath);
+        client.close();
+      } catch (ftpErr) {
+        console.warn("No se pudo borrar archivo FTP:", ftpErr.message);
+      }
+
+      // 3️⃣ Borrar tablas específicas
+      if (categoria === "utilitarios") {
+        await db.promise().query(
+          "DELETE FROM polizas_utilitarios WHERE poliza_id = ?",
+          [id]
+        );
+      }
+
+      if (categoria === "maquinaria") {
+        await db.promise().query(
+          "DELETE FROM polizas_maquinaria WHERE poliza_id = ?",
+          [id]
+        );
+      }
+
+      if (categoria === "empresarial") {
+        await db.promise().query(
+          "DELETE FROM polizas_empresarial WHERE poliza_id = ?",
+          [id]
+        );
+      }
+
+      // 4️⃣ Borrar tabla principal
+      await db.promise().query("DELETE FROM polizas WHERE id = ?", [id]);
+
+      res.json({ ok: true, message: "Póliza eliminada correctamente" });
+
+    } catch (err) {
+      console.error("ERROR DELETE POLIZA:", err);
+      res.status(500).json({ message: "Error al eliminar póliza" });
+    }
+  }
+);
+
+// =============================
+// ACTUALIZAR PÓLIZA
+// =============================
+app.put(
+  "/polizas/:categoria/:id",
+  uploadPoliza.single("archivo"),
+  validarRol(["Administrador", "RH"]),
+  async (req, res) => {
+    const { categoria, id } = req.params;
+
+    try {
+      const {
+        numero_poliza,
+        aseguradora,
+        fecha_inicio,
+        fecha_fin,
+        ...extra
+      } = req.body;
+
+      // 1️⃣ Actualizar tabla principal
+      await db.promise().query(
+        `
+        UPDATE polizas
+        SET numero_poliza=?, aseguradora=?, fecha_inicio=?, fecha_fin=?
+        WHERE id=?
+        `,
+        [numero_poliza, aseguradora, fecha_inicio, fecha_fin, id]
+      );
+
+      // 2️⃣ Actualizar tabla específica
+      if (categoria === "utilitarios") {
+        await db.promise().query(
+          `
+          UPDATE polizas_utilitarios
+          SET unidad=?, concepto=?, serie=?, asignado=?, estatus=?, agencia=?
+          WHERE poliza_id=?
+          `,
+          [
+            extra.unidad,
+            extra.concepto,
+            extra.serie,
+            extra.asignado,
+            extra.estatus,
+            extra.agencia,
+            id
+          ]
+        );
+      }
+
+      if (categoria === "maquinaria") {
+        await db.promise().query(
+          `
+          UPDATE polizas_maquinaria
+          SET unidad=?, concepto=?, serie=?
+          WHERE poliza_id=?
+          `,
+          [extra.unidad, extra.concepto, extra.serie, id]
+        );
+      }
+
+      if (categoria === "empresarial") {
+        await db.promise().query(
+          `
+          UPDATE polizas_empresarial
+          SET beneficiario=?, tipo=?, estatus=?
+          WHERE poliza_id=?
+          `,
+          [extra.beneficiario, extra.tipo, extra.estatus, id]
+        );
+      }
+
+      // 3️⃣ Si viene PDF nuevo → reemplazar
+      if (req.file) {
+        // (usar lógica FTP que ya tienes)
+        // actualizar archivo_url
+      }
+
+      res.json({ ok: true, message: "Póliza actualizada" });
+
+    } catch (err) {
+      console.error("ERROR PUT POLIZA:", err);
+      res.status(500).json({ message: "Error al actualizar póliza" });
+    }
+  }
+);
