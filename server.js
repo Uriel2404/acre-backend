@@ -3655,7 +3655,7 @@ app.put("/prestamo-personal/:id", async (req, res) => {
         })
       });
       
-      
+
 
     } catch (mailError) {
       console.error("❌ Error enviando correo préstamo:", mailError);
@@ -3677,3 +3677,6 @@ app.put("/prestamo-personal/:id", async (req, res) => {
   }
 });
 
+// ======================
+// POLIZAS DE VEHICULOS
+// ======================
