@@ -3706,6 +3706,7 @@ app.get("/polizas/utilitarios", async (req, res) => {
     const [rows] = await db.promise().query(`
       SELECT 
         p.id,
+        p.foto_url,  
         u.unidad,
         u.concepto,
         u.serie,
@@ -3735,6 +3736,7 @@ app.get("/polizas/maquinaria", async (req, res) => {
     const [rows] = await db.promise().query(`
       SELECT 
         p.id,
+        p.foto_url,      
         m.unidad,
         m.concepto,
         m.serie,
@@ -3761,6 +3763,7 @@ app.get("/polizas/empresarial", async (req, res) => {
     const [rows] = await db.promise().query(`
       SELECT 
         p.id,
+        p.foto_url,       
         e.beneficiario,
         e.tipo,
         e.estatus,
@@ -4001,10 +4004,6 @@ app.post(
 
 // =============================
 // ELIMINAR PÓLIZA
-// =============================
-// =============================
-// ELIMINAR PÓLIZA (ESTILO DOCUMENTS)
-// body: { id, categoria }
 // =============================
 app.post("/polizas/delete", async (req, res) => {
   try {
@@ -4268,7 +4267,7 @@ app.post(
           const fileName =
             Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
 
-          const remoteDir = `/public_html/Intranet/vehiculos`;
+          const remoteDir = `/public_html/intranet/vehiculos`;
           const remotePath = `${remoteDir}/${fileName}`;
 
           await client.ensureDir(remoteDir);
@@ -4277,7 +4276,7 @@ app.post(
 
           fs.unlinkSync(req.file.path);
 
-          const fotoUrl = `https://acre.mx/Intranet/vehiculos/${fileName}`;
+          const fotoUrl = `https://acre.mx/intranet/vehiculos/${fileName}`;
 
           // 3️⃣ Guardar URL
           db.query(
