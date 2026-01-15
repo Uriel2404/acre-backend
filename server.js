@@ -3714,7 +3714,7 @@ app.get("/polizas/utilitarios", async (req, res) => {
         u.estatus,
         u.agencia,
         p.numero_poliza,  
-        p.aseguradora,
+        p.aseguradora,  
         p.fecha_inicio,
         p.fecha_fin,
         p.archivo_url
