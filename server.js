@@ -3892,7 +3892,7 @@ app.post(
       res.json({ ok: true, message: "Póliza de utilitario registrada" });
 
     } catch (err) {
-      console.error("ERROR POST POLIZA UTILITARIOS:", err);
+      console.error("ERROR POST POLIZA REC:", err);
       res.status(500).json({ message: "Error al registrar póliza" });
     }
   }
