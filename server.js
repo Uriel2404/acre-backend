@@ -3700,6 +3700,35 @@ const uploadPoliza = multer({
 // =============================
 // OBETENER POLIZAS DE VEHICULOS
 // =============================
+app.get("/polizas/REC", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT 
+        p.id,
+        p.foto_url,  
+        u.unidad,
+        u.concepto,
+        u.serie,
+        u.asignado,
+        u.estatus,
+        u.agencia,
+        p.numero_poliza,  
+        p.aseguradora,  
+        p.fecha_inicio,
+        p.fecha_fin,
+        p.archivo_url
+      FROM polizas p
+      INNER JOIN polizas_rec r ON p.id = r.poliza_id
+      WHERE p.categoria = 'REC'
+      ORDER BY p.fecha_fin DESC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("ERROR POLIZAS REC:", err);
+    res.status(500).json({ message: "Error al obtener pólizas de REC" });
+  }
+});
 
 app.get("/polizas/utilitarios", async (req, res) => {
   try {
@@ -3788,6 +3817,87 @@ app.get("/polizas/empresarial", async (req, res) => {
 // =============================
 // REGISTRAR PÓLIZA DE VEHÍCULO
 // =============================
+app.post(
+  "/polizas/REC",
+  uploadPoliza.single("archivo"),
+  async (req, res) => {
+    try {
+      const {
+        numero_poliza,
+        aseguradora,
+        fecha_inicio,
+        fecha_fin,
+        unidad,
+        concepto,
+        serie,
+        asignado,
+        estatus,
+        agencia
+      } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No se envió archivo PDF" });
+      }
+
+      // ======================
+      // SUBIR PDF A FTP
+      // ======================
+      const localPath = req.file.path;
+      const fileName = Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+      const client = new ftp.Client();
+      await client.access({
+        host: process.env.FTP_HOST,
+        user: process.env.FTP_USER,
+        password: process.env.FTP_PASS,
+        secure: false
+      });
+
+      await client.ensureDir("/public_html/Intranet/polizas/REC");
+      await client.uploadFrom(localPath, `/public_html/Intranet/polizas/REC/${fileName}`);
+      client.close();
+
+      const archivoUrl = `https://acre.mx/Intranet/polizas/REC/${fileName}`;
+      fs.unlinkSync(localPath);
+
+      // ======================
+      // INSERT BD
+      // ======================
+      const [polizaResult] = await db.promise().query(
+        `
+        INSERT INTO polizas
+        (categoria, numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivo_url)
+        VALUES ('REC', ?, ?, ?, ?, ?)
+        `,
+        [numero_poliza, aseguradora, fecha_inicio, fecha_fin, archivoUrl]
+      );
+
+      await db.promise().query(
+        `
+        INSERT INTO polizas_rec
+        (poliza_id, unidad, concepto, serie, asignado, estatus, agencia)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          polizaResult.insertId,
+          unidad,
+          concepto,
+          serie,
+          asignado,
+          estatus || "vigente",
+          agencia
+        ]
+      );
+
+      res.json({ ok: true, message: "Póliza de utilitario registrada" });
+
+    } catch (err) {
+      console.error("ERROR POST POLIZA UTILITARIOS:", err);
+      res.status(500).json({ message: "Error al registrar póliza" });
+    }
+  }
+);
+
 app.post(
   "/polizas/utilitarios",
   uploadPoliza.single("archivo"),
@@ -4054,6 +4164,9 @@ app.post("/polizas/delete", async (req, res) => {
 
         // 3️⃣ Borrar tabla específica
         let deleteSpecific = null;
+        if (categoria === "REC") {
+          deleteSpecific = "DELETE FROM polizas_rec WHERE poliza_id = ?";
+        }
         if (categoria === "utilitarios") {
           deleteSpecific = "DELETE FROM polizas_utilitarios WHERE poliza_id = ?";
         }
@@ -4137,6 +4250,25 @@ app.put(
       );
 
       // 2️⃣ Actualizar tabla específica
+      if (categoria === "REC") {
+        await db.promise().query(
+          `
+          UPDATE polizas_rec
+          SET unidad=?, concepto=?, serie=?, asignado=?, estatus=?, agencia=?
+          WHERE poliza_id=?
+          `,
+          [
+            extra.unidad,
+            extra.concepto,
+            extra.serie,
+            extra.asignado,
+            extra.estatus || "vigente",
+            extra.agencia,
+            id
+          ]
+        );
+      }
+
       if (categoria === "utilitarios") {
         await db.promise().query(
           `
