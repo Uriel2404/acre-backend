@@ -4429,3 +4429,93 @@ app.post(
     }
   }
 );
+
+
+//===========================================
+// I N V E N T A R I O   D E   E Q U I P O S
+//===========================================
+app.post(
+  "/subir-inventario",
+  uploadExcel.single("archivo"),
+  async (req, res) => {
+    try {
+      const workbook = XLSX.readFile(req.file.path);
+      const sheetName = workbook.SheetNames[0];
+      const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+      for (const row of data) {
+        const usuario = limpiar(row["USUARIO"]);
+        const descripcion = limpiar(row["DESCRIPCIÓN DEL EQUIPO"]);
+        const marca = limpiar(row["MARCA"]);
+        const tipo_equipo = limpiar(row["EQUIPO"]);
+        const departamento = limpiar(row["DEPARTAMENTO"]);
+        const procesador = limpiar(row["PROCESADOR"]);
+        const serie = limpiar(row["# SERIE"]);
+        const valor_factura = row["VALOR FACTURA"] || null;
+        const ubicacion = limpiar(row["OBRA"]);
+        const estatus = limpiar(row["ESTATUS"]) || "Activo";
+        const comentarios = limpiar(row["COMENTARIOS"]);
+        const propiedad = limpiar(row["PROPIO/RENTADO"]);
+        const num_factura = limpiar(row["Factura"]);
+        const fecha_factura = row["Fecha Factura"]
+          ? XLSX.SSF.parse_date_code(row["Fecha Factura"])
+          : null;
+        const orden_compra = limpiar(row["OC - EK"]);
+
+        const fechaFacturaSQL = fecha_factura
+          ? `${fecha_factura.y}-${fecha_factura.m}-${fecha_factura.d}`
+          : null;
+
+        await db.promise().query(
+          `INSERT INTO inventario_equipos (
+            usuario, descripcion, marca, tipo_equipo, departamento,
+            procesador, serie, valor_factura, ubicacion,
+            estatus, comentarios, propiedad,
+            num_factura, fecha_factura, orden_compra
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            usuario = VALUES(usuario),
+            descripcion = VALUES(descripcion),
+            marca = VALUES(marca),
+            tipo_equipo = VALUES(tipo_equipo),
+            departamento = VALUES(departamento),
+            procesador = VALUES(procesador),
+            valor_factura = VALUES(valor_factura),
+            ubicacion = VALUES(ubicacion),
+            estatus = VALUES(estatus),
+            comentarios = VALUES(comentarios),
+            propiedad = VALUES(propiedad),
+            num_factura = VALUES(num_factura),
+            fecha_factura = VALUES(fecha_factura),
+            orden_compra = VALUES(orden_compra)
+          `,
+          [
+            usuario, descripcion, marca, tipo_equipo, departamento,
+            procesador, serie, valor_factura, ubicacion,
+            estatus, comentarios, propiedad,
+            num_factura, fechaFacturaSQL, orden_compra
+          ]
+        );
+      }
+
+      res.json({ ok: true, mensaje: "Inventario cargado correctamente" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error al procesar el Excel" });
+    }
+  }
+);
+
+
+// =============================
+// OBTENER INVENTARIO DE EQUIPOS
+// =============================
+app.get("/equipos", async (req, res) => {
+  const [rows] = await db.promise().query(`
+    SELECT *
+    FROM inventario_equipos
+    ORDER BY estatus = 'Activo' DESC, fecha_registro DESC
+  `);
+  res.json(rows);
+});
