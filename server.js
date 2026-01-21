@@ -4435,7 +4435,7 @@ app.post(
 // I N V E N T A R I O   D E   E Q U I P O S
 //===========================================
 const uploadExcel = require("../middlewares/uploadExcel");
-const XLSX = require("xlsx");
+
 app.post(
   "/subir-inventario",
   uploadExcel.single("archivo"),
