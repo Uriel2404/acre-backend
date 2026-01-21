@@ -9,7 +9,7 @@ import path from "path";
 import crypto from "crypto";
 import XLSX from "xlsx";
 import ExcelJS from "exceljs";
-import uploadExcel from "../middlewares/uploadExcel.js";
+import uploadExcel from "./middlewares/uploadExcel.js";
 
 dotenv.config();
 
