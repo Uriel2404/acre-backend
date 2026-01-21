@@ -9,7 +9,7 @@ import path from "path";
 import crypto from "crypto";
 import XLSX from "xlsx";
 import ExcelJS from "exceljs";
-
+import uploadExcel from "../middlewares/uploadExcel.js";
 
 dotenv.config();
 
@@ -4434,7 +4434,6 @@ app.post(
 //===========================================
 // I N V E N T A R I O   D E   E Q U I P O S
 //===========================================
-const uploadExcel = require("../middlewares/uploadExcel");
 
 app.post(
   "/subir-inventario",
