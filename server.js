@@ -4434,6 +4434,10 @@ app.post(
 //===========================================
 // I N V E N T A R I O   D E   E Q U I P O S
 //===========================================
+const limpiar = (valor) => {
+  if (valor === undefined || valor === null || valor === "") return null;
+  return valor.toString().trim();
+};
 
 app.post(
   "/subir-inventario",
