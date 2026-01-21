@@ -4536,3 +4536,73 @@ app.get("/equipos", async (req, res) => {
   res.json(rows);
 });
 
+
+// =============================
+// EDITAR EQUIPO
+// =============================
+app.put("/actualizar-equipo/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const {
+    usuario,
+    tipo_equipo,
+    descripcion,
+    marca,
+    serie,
+    departamento,
+    ubicacion,
+    procesador,
+    estatus,
+    propiedad,
+    num_factura,
+    fecha_factura,
+    valor_factura,
+    orden_compra,
+    comentarios
+  } = req.body;
+
+  try {
+    await db.promise().query(
+      `UPDATE inventario_equipos SET
+        usuario = ?,
+        tipo_equipo = ?,
+        descripcion = ?,
+        marca = ?,
+        serie = ?,
+        departamento = ?,
+        ubicacion = ?,
+        procesador = ?,
+        estatus = ?,
+        propiedad = ?,
+        num_factura = ?,
+        fecha_factura = ?,
+        valor_factura = ?,
+        orden_compra = ?,
+        comentarios = ?
+      WHERE id = ?`,
+      [
+        usuario,
+        tipo_equipo,
+        descripcion,
+        marca,
+        serie,
+        departamento,
+        ubicacion,
+        procesador,
+        estatus,
+        propiedad,
+        num_factura,
+        fecha_factura,
+        valor_factura,
+        orden_compra,
+        comentarios,
+        id
+      ]
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("ERROR AL ACTUALIZAR EQUIPO:", error);
+    res.status(500).json({ error: "No se pudo actualizar el equipo" });
+  }
+});
