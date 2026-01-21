@@ -4521,3 +4521,4 @@ app.get("/equipos", async (req, res) => {
   `);
   res.json(rows);
 });
+
