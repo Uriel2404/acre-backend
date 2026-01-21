@@ -4438,6 +4438,17 @@ const limpiar = (valor) => {
   if (valor === undefined || valor === null || valor === "") return null;
   return valor.toString().trim();
 };
+const normalizarPropiedad = (valor) => {
+  if (!valor) return null;
+
+  const v = valor.toString().trim().toUpperCase();
+
+  if (v.includes("PROPIO")) return "Propio";
+  if (v.includes("RENTA")) return "Rentado";
+
+  return null;
+};
+
 
 app.post(
   "/subir-inventario",
@@ -4460,7 +4471,7 @@ app.post(
         const ubicacion = limpiar(row["OBRA"]);
         const estatus = limpiar(row["ESTATUS"]) || "Activo";
         const comentarios = limpiar(row["COMENTARIOS"]);
-        const propiedad = limpiar(row["PROPIO/RENTADO"]);
+        const propiedad = normalizarPropiedad(row["PROPIO/RENTADO"]);
         const num_factura = limpiar(row["Factura"]);
         const fecha_factura = row["Fecha Factura"]
           ? XLSX.SSF.parse_date_code(row["Fecha Factura"])
