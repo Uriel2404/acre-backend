@@ -3769,7 +3769,7 @@ app.get("/polizas/maquinaria", async (req, res) => {
         m.unidad,
         m.concepto,
         m.serie,
-        m,estatus,
+        m.estatus,
         p.numero_poliza,
         p.aseguradora,
         p.fecha_inicio,
