@@ -3769,6 +3769,7 @@ app.get("/polizas/maquinaria", async (req, res) => {
         m.unidad,
         m.concepto,
         m.serie,
+        m,estatus,
         p.numero_poliza,
         p.aseguradora,
         p.fecha_inicio,
@@ -3991,7 +3992,8 @@ app.post(
         fecha_fin,
         unidad,
         concepto,
-        serie
+        serie,
+        estatus
       } = req.body;
 
       if (!req.file) {
@@ -4028,10 +4030,10 @@ app.post(
       await db.promise().query(
         `
         INSERT INTO polizas_maquinaria
-        (poliza_id, unidad, concepto, serie)
-        VALUES (?, ?, ?, ?)
+        (poliza_id, unidad, concepto, serie, estatus)
+        VALUES (?, ?, ?, ?, ?)
         `,
-        [polizaResult.insertId, unidad, concepto, serie]
+        [polizaResult.insertId, unidad, concepto, serie, estatus || "vigente",]
       );
 
       res.json({ ok: true, message: "Póliza de maquinaria registrada" });
