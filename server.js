@@ -395,6 +395,25 @@ app.post("/reset-password-admin", (req, res) => {
 });
 
 
+// ==============================
+// LISTAR USUARIOS (RH / ADMIN)
+// ==============================
+app.get("/usuarios", (req, res) => {
+  const sql = `
+    SELECT id, nombre, email, rol, password_creada
+    FROM usuarios
+    ORDER BY nombre
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("ERROR MYSQL:", err);
+      return res.status(500).json({ message: "Error al obtener usuarios" });
+    }
+
+    res.json(result);
+  });
+});
 
 
 // ===============================================================
