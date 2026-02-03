@@ -368,6 +368,34 @@ app.post("/crear-password", async (req, res) => {
 });
 
 
+// ==============================
+// RESET PASSWORD (RH / ADMIN)
+// ==============================
+app.post("/reset-password-admin", (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId)
+    return res.status(400).json({ message: "Falta el usuario" });
+
+  const sql = `
+    UPDATE usuarios
+    SET password = NULL,
+        password_creada = 0
+    WHERE id = ?
+  `;
+
+  db.query(sql, [userId], (err) => {
+    if (err) {
+      console.error("ERROR MYSQL:", err);
+      return res.status(500).json({ message: "Error al resetear contraseña" });
+    }
+
+    res.json({ message: "Contraseña restablecida correctamente" });
+  });
+});
+
+
+
 
 // ===============================================================
 //                    C A R R U S E L
