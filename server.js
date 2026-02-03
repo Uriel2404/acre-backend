@@ -4608,3 +4608,54 @@ app.put("/actualizar-equipo/:id", async (req, res) => {
     res.status(500).json({ error: "No se pudo actualizar el equipo" });
   }
 });
+
+
+// =============================
+// EXPORTAR INVENTARIO A EXCEL
+// =============================
+app.get("/exportar-equipos", async (req, res) => {
+  try {
+    const [equipos] = await db.promise().query("SELECT * FROM equipos");
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Inventario");
+
+    worksheet.columns = [
+      { header: "ID", key: "id", width: 10 },
+      { header: "Usuario", key: "usuario", width: 20 },
+      { header: "Tipo de equipo", key: "tipo_equipo", width: 20 },
+      { header: "Marca", key: "marca", width: 15 },
+      { header: "Serie", key: "serie", width: 20 },
+      { header: "Departamento", key: "departamento", width: 20 },
+      { header: "Ubicación", key: "ubicacion", width: 20 },
+      { header: "Estatus", key: "estatus", width: 12 },
+      { header: "Propiedad", key: "propiedad", width: 12 },
+      { header: "No. Factura", key: "num_factura", width: 15 },
+      { header: "Fecha factura", key: "fecha_factura", width: 15 },
+      { header: "Valor factura", key: "valor_factura", width: 15 },
+      { header: "Orden compra", key: "orden_compra", width: 15 },
+      { header: "Comentarios", key: "comentarios", width: 30 }
+    ];
+
+    equipos.forEach(equipo => {
+      worksheet.addRow(equipo);
+    });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=inventario_equipos.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al generar Excel" });
+  }
+});
