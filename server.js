@@ -4436,7 +4436,6 @@ app.post(
 // =============================
 // EXPORTAR REPORTE DE PÓLIZAS
 // =============================
-const XLSX = require("xlsx");
 
 app.get("/polizas/reporte/excel", async (req, res) => {
   try {
