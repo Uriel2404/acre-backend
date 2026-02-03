@@ -4433,6 +4433,61 @@ app.post(
 );
 
 
+// =============================
+// REPORTE EXCEL DE PÓLIZAS
+// =============================
+app.get("/polizas/reporte/excel", async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(`
+      SELECT 
+        p.id,
+        p.categoria,
+        p.numero_poliza,
+        p.aseguradora,
+        p.fecha_inicio,
+        p.fecha_fin,
+
+        -- UTILITARIOS
+        u.unidad,
+        u.concepto,
+        u.serie,
+        u.asignado,
+        u.estatus,
+        u.agencia
+
+      FROM polizas p
+      LEFT JOIN polizas_utilitarios u ON p.id = u.poliza_id
+      ORDER BY p.fecha_fin DESC
+    `);
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Polizas");
+
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx"
+    });
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=Reporte_Polizas.xlsx"
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.send(buffer);
+
+  } catch (err) {
+    console.error("ERROR REPORTE:", err);
+    res.status(500).json({ message: "Error al generar reporte" });
+  }
+});
+
+
 //===========================================
 // I N V E N T A R I O   D E   E Q U I P O S
 //===========================================
