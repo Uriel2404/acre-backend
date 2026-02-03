@@ -4432,6 +4432,7 @@ app.post(
   }
 );
 
+
 // =============================
 // EXPORTAR REPORTE DE PÓLIZAS
 // =============================
@@ -4480,34 +4481,21 @@ app.get("/polizas/reporte/excel", async (req, res) => {
       "Asignado": r.asignado || "",
       "Estatus": r.estatus || "",
       "Agencia": r.agencia || "",
-      "Ver póliza (PDF)": r.archivo_url || ""
+      "Póliza PDF": r.archivo_url
+        ? { f: `HYPERLINK("${r.archivo_url}", "Abrir PDF")` }
+        : ""
     }));
 
     // =============================
     // CREAR EXCEL
     // =============================
-    const worksheet = XLSX.utils.json_to_sheet(data);
-
-    // 🔗 HACER LINKS CLICKEABLES
-    Object.keys(worksheet).forEach(cell => {
-      if (
-        worksheet[cell]?.v &&
-        typeof worksheet[cell].v === "string" &&
-        worksheet[cell].v.startsWith("http")
-      ) {
-        worksheet[cell].l = {
-          Target: worksheet[cell].v,
-          Tooltip: "Abrir póliza PDF"
-        };
-      }
+    const worksheet = XLSX.utils.json_to_sheet(data, {
+      cellDates: true
     });
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte_Polizas");
 
-    // =============================
-    // RESPUESTA COMO ARCHIVO
-    // =============================
     const buffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "buffer"
