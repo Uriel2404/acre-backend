@@ -4614,7 +4614,8 @@ app.put("/actualizar-equipo/:id", async (req, res) => {
 // ============================
 app.get("/exportar-equipos", async (req, res) => {
   try {
-    const [equipos] = await db.promise().query("SELECT * FROM equipos");
+    const [equipos] = await db.promise().query("SELECT * FROM inventario_equipos");
+    console.log("Equipos encontrados:", equipos.length);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Inventario");
