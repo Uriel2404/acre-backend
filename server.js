@@ -4609,10 +4609,9 @@ app.put("/actualizar-equipo/:id", async (req, res) => {
   }
 });
 
-
-// =============================
+// ============================
 // EXPORTAR INVENTARIO A EXCEL
-// =============================
+// ============================
 app.get("/exportar-equipos", async (req, res) => {
   try {
     const [equipos] = await db.promise().query("SELECT * FROM equipos");
