@@ -293,8 +293,8 @@ function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password)
-    return res.status(400).json({ message: "Faltan datos" });
+  if (!email)
+    return res.status(400).json({ message: "Falta el correo" });
 
   const sqlUser = "SELECT * FROM usuarios WHERE email = ?";
   const sqlEmpleado = "SELECT * FROM empleados WHERE correo = ?";
@@ -306,16 +306,24 @@ app.post("/login", async (req, res) => {
     }
 
     if (result.length === 0)
-      return res.status(401).json({ message: "Credenciales incorrectas" });
+      return res.status(401).json({ message: "Usuario no encontrado" });
 
     const user = result[0];
 
-    // Validación de password simple (igual que ya haces)
-    if (password !== user.password) {
+    // 👇 PRIMER INGRESO (sin contraseña)
+    if (!user.password || user.password_creada === 0) {
+      return res.status(200).json({
+        firstLogin: true,
+        userId: user.id,
+        email: user.email,
+      });
+    }
+
+    // 👇 LOGIN NORMAL
+    if (!password || password !== user.password) {
       return res.status(401).json({ message: "Credenciales incorrectas" });
     }
 
-    // AHORA BUSCAMOS SU REGISTRO DE EMPLEADO
     db.query(sqlEmpleado, [email], (err2, empleadoResult) => {
       if (err2) {
         console.error("ERROR MYSQL:", err2);
@@ -328,10 +336,37 @@ app.post("/login", async (req, res) => {
         message: "Login exitoso",
         user,
         empleado,
+        firstLogin: false,
       });
     });
   });
 });
+
+// ================================
+//  CREAR CONTRASEÑA PRIMER INGRESO
+// ================================
+app.post("/crear-password", async (req, res) => {
+  const { userId, password } = req.body;
+
+  if (!userId || !password)
+    return res.status(400).json({ message: "Faltan datos" });
+
+  const sql = `
+    UPDATE usuarios 
+    SET password = ?, password_creada = 1
+    WHERE id = ?
+  `;
+
+  db.query(sql, [password, userId], (err) => {
+    if (err) {
+      console.error("ERROR MYSQL:", err);
+      return res.status(500).json({ message: "Error al crear contraseña" });
+    }
+
+    return res.json({ message: "Contraseña creada correctamente" });
+  });
+});
+
 
 
 // ===============================================================
