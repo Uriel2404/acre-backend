@@ -4432,10 +4432,11 @@ app.post(
   }
 );
 
+// =============================
+// EXPORTAR REPORTE DE PÓLIZAS
+// =============================
+const XLSX = require("xlsx");
 
-// =============================
-// REPORTE EXCEL DE PÓLIZAS
-// =============================
 app.get("/polizas/reporte/excel", async (req, res) => {
   try {
     const [rows] = await db.promise().query(`
@@ -4446,8 +4447,8 @@ app.get("/polizas/reporte/excel", async (req, res) => {
         p.aseguradora,
         p.fecha_inicio,
         p.fecha_fin,
+        p.archivo_url,
 
-        -- UTILITARIOS
         u.unidad,
         u.concepto,
         u.serie,
@@ -4460,19 +4461,61 @@ app.get("/polizas/reporte/excel", async (req, res) => {
       ORDER BY p.fecha_fin DESC
     `);
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    if (!rows.length) {
+      return res.status(404).json({ message: "No hay pólizas para exportar" });
+    }
+
+    // =============================
+    // FORMATEAR DATOS PARA EXCEL
+    // =============================
+    const data = rows.map(r => ({
+      "Categoría": r.categoria,
+      "Número de póliza": r.numero_poliza,
+      "Aseguradora": r.aseguradora,
+      "Fecha inicio": r.fecha_inicio,
+      "Fecha fin": r.fecha_fin,
+      "Unidad": r.unidad || "",
+      "Concepto": r.concepto || "",
+      "Serie": r.serie || "",
+      "Asignado": r.asignado || "",
+      "Estatus": r.estatus || "",
+      "Agencia": r.agencia || "",
+      "Ver póliza (PDF)": r.archivo_url || ""
+    }));
+
+    // =============================
+    // CREAR EXCEL
+    // =============================
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // 🔗 HACER LINKS CLICKEABLES
+    Object.keys(worksheet).forEach(cell => {
+      if (
+        worksheet[cell]?.v &&
+        typeof worksheet[cell].v === "string" &&
+        worksheet[cell].v.startsWith("http")
+      ) {
+        worksheet[cell].l = {
+          Target: worksheet[cell].v,
+          Tooltip: "Abrir póliza PDF"
+        };
+      }
+    });
+
     const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte_Polizas");
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Polizas");
-
+    // =============================
+    // RESPUESTA COMO ARCHIVO
+    // =============================
     const buffer = XLSX.write(workbook, {
-      type: "buffer",
-      bookType: "xlsx"
+      bookType: "xlsx",
+      type: "buffer"
     });
 
     res.setHeader(
       "Content-Disposition",
-      "attachment; filename=Reporte_Polizas.xlsx"
+      "attachment; filename=reporte_polizas.xlsx"
     );
     res.setHeader(
       "Content-Type",
@@ -4482,10 +4525,11 @@ app.get("/polizas/reporte/excel", async (req, res) => {
     res.send(buffer);
 
   } catch (err) {
-    console.error("ERROR REPORTE:", err);
-    res.status(500).json({ message: "Error al generar reporte" });
+    console.error("ERROR REPORTE EXCEL:", err);
+    res.status(500).json({ message: "Error al generar el reporte" });
   }
 });
+
 
 
 //===========================================
