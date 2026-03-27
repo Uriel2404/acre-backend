@@ -10,6 +10,7 @@ import crypto from "crypto";
 import XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import uploadExcel from "./middlewares/uploadExcel.js";
+import bcrypt from "bcrypt";
 
 dotenv.config();
 
@@ -4814,5 +4815,66 @@ app.get("/exportar-equipos", async (req, res) => {
   } catch (error) {
     console.error("ERROR EXPORTANDO EXCEL:", error);
     res.status(500).json({ error: "Error al generar Excel" });
+  }
+});
+
+
+
+// ===============================================================
+//            C A M B I O   D E   C O N T R A S E Ñ A
+// ===============================================================
+
+
+app.post("/change-password", async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Faltan datos" });
+    }
+
+    // Obtener usuario
+    db.query(
+      "SELECT password FROM usuarios WHERE id = ?",
+      [userId],
+      async (err, result) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).json({ message: "Error servidor" });
+        }
+
+        if (!result.length) {
+          return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        const user = result[0];
+
+        // Comparar password actual
+        const match = await bcrypt.compare(currentPassword, user.password);
+
+        if (!match) {
+          return res.status(401).json({ message: "Contraseña actual incorrecta" });
+        }
+
+        // Hashear nueva password
+        const hashed = await bcrypt.hash(newPassword, 10);
+
+        db.query(
+          "UPDATE usuarios SET password = ? WHERE id = ?",
+          [hashed, userId],
+          (err2) => {
+            if (err2) {
+              console.error(err2);
+              return res.status(500).json({ message: "Error actualizando password" });
+            }
+
+            res.json({ message: "Contraseña actualizada correctamente" });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error servidor" });
   }
 });
