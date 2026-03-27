@@ -35,7 +35,6 @@ app.listen(3000, () => {
   console.log("Servidor corriendo");
 });
 
-const multer = require("multer");
 const fs = require("fs");
 const ftp = require("basic-ftp");
 
