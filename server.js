@@ -4903,3 +4903,80 @@ app.post("/change-password", async (req, res) => {
     res.status(500).json({ message: "Error servidor" });
   }
 });
+
+
+
+// =============================
+// SUBIR FOTO DE PERFIL
+// =============================
+const uploadProfile = multer({
+  dest: "/tmp",
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+app.post("/usuarios/:id/foto", uploadProfile.single("foto"), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió imagen" });
+    }
+
+    // 1️⃣ Obtener usuario actual
+    const [[user]] = await db.promise().query(
+      "SELECT foto_url FROM usuarios WHERE id = ?",
+      [id]
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    // 2️⃣ FTP
+    const client = new ftp.Client();
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USER,
+      password: process.env.FTP_PASS,
+      secure: false
+    });
+
+    const fileName =
+      Date.now() + "_" + req.file.originalname.replace(/\s+/g, "_");
+
+    const remoteDir = `/public_html/intranet/perfiles`;
+    const remotePath = `${remoteDir}/${fileName}`;
+
+    await client.ensureDir(remoteDir);
+
+    // 🔥 borrar anterior si existe
+    if (user.foto_url) {
+      try {
+        const oldFile = user.foto_url.split("/").pop();
+        await client.remove(`${remoteDir}/${oldFile}`);
+      } catch (e) {
+        console.warn("No se pudo borrar foto anterior");
+      }
+    }
+
+    // subir nueva
+    await client.uploadFrom(req.file.path, remotePath);
+    client.close();
+
+    fs.unlinkSync(req.file.path);
+
+    const fotoUrl = `https://acre.mx/intranet/perfiles/${fileName}`;
+
+    // 3️⃣ guardar en BD
+    await db.promise().query(
+      "UPDATE usuarios SET foto_url = ? WHERE id = ?",
+      [fotoUrl, id]
+    );
+
+    res.json({ foto_url: fotoUrl });
+
+  } catch (err) {
+    console.error("ERROR FOTO PERFIL:", err);
+    res.status(500).json({ message: "Error subiendo foto" });
+  }
+});
