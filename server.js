@@ -291,57 +291,41 @@ function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
 // ======================
 //  LOGIN CON EMPLEADO
 // ======================
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+import bcrypt from "bcrypt";
 
-  if (!email)
-    return res.status(400).json({ message: "Falta el correo" });
+// 👇 LOGIN NORMAL
+if (!password) {
+  return res.status(401).json({ message: "Credenciales incorrectas" });
+}
 
-  const sqlUser = "SELECT * FROM usuarios WHERE email = ?";
-  const sqlEmpleado = "SELECT * FROM empleados WHERE correo = ?";
+let isMatch = false;
 
-  db.query(sqlUser, [email], async (err, result) => {
-    if (err) {
-      console.error("ERROR MYSQL:", err);
-      return res.status(500).json({ message: "Error en el servidor" });
-    }
+// 🔍 Detectar si ya está hasheada
+if (user.password.startsWith("$2b$")) {
+  // ✅ Password con bcrypt
+  isMatch = await bcrypt.compare(password, user.password);
+} else {
+  // ⚠️ Password vieja (texto plano)
+  isMatch = password === user.password;
 
-    if (result.length === 0)
-      return res.status(401).json({ message: "Usuario no encontrado" });
+  // 🔥 MIGRACIÓN AUTOMÁTICA A HASH
+  if (isMatch) {
+    const hashed = await bcrypt.hash(password, 10);
 
-    const user = result[0];
-
-    // 👇 PRIMER INGRESO (sin contraseña)
-    if (!user.password || user.password_creada === 0) {
-      return res.status(200).json({
-        firstLogin: true,
-        userId: user.id,
-        email: user.email,
-      });
-    }
-
-    // 👇 LOGIN NORMAL
-    if (!password || password !== user.password) {
-      return res.status(401).json({ message: "Credenciales incorrectas" });
-    }
-
-    db.query(sqlEmpleado, [email], (err2, empleadoResult) => {
-      if (err2) {
-        console.error("ERROR MYSQL:", err2);
-        return res.status(500).json({ message: "Error al obtener empleado" });
+    db.query(
+      "UPDATE usuarios SET password = ? WHERE id = ?",
+      [hashed, user.id],
+      (err) => {
+        if (err) console.error("Error migrando password:", err);
+        else console.log("🔐 Password migrada a bcrypt");
       }
+    );
+  }
+}
 
-      const empleado = empleadoResult.length > 0 ? empleadoResult[0] : null;
-
-      return res.json({
-        message: "Login exitoso",
-        user,
-        empleado,
-        firstLogin: false,
-      });
-    });
-  });
-});
+if (!isMatch) {
+  return res.status(401).json({ message: "Credenciales incorrectas" });
+}
 
 // ================================
 //  CREAR CONTRASEÑA PRIMER INGRESO
