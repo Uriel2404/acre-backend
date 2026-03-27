@@ -291,7 +291,6 @@ function obtenerFechaInicioPeriodo(fechaIngreso, anioLaborado) {
 // ======================
 //  LOGIN CON EMPLEADO
 // ======================
-import bcrypt from "bcrypt";
 
 // 👇 LOGIN NORMAL
 if (!password) {
